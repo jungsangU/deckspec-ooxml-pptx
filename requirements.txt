@@ -1,0 +1,2 @@
+# No external Python packages are required.
+# The renderer uses only the Python standard library.

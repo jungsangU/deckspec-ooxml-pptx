@@ -1,0 +1,387 @@
+# DeckSpec OOXML PPTX Renderer
+
+DeckSpec JSON을 입력받아 PowerPoint 내부 언어인 OOXML 파일들을 직접 만들고, 이를 `.pptx`로 패키징하는 Python 스크립트입니다.
+
+LLM은 발표 내용과 디자인 의도를 `DeckSpec JSON`으로 만들고, 이 스크립트는 JSON을 안정적인 OOXML/PPTX로 렌더링하는 역할을 합니다.
+
+## Files
+
+```text
+deckspec-ooxml-pptx/
+├── make_ppt.py
+├── deckspec_template.json
+├── README.md
+└── requirements.txt
+```
+
+## Requirements
+
+Python 3.9 이상을 권장합니다.
+
+외부 패키지는 필요 없습니다. `requirements.txt`는 의존성이 없음을 명시하기 위해 포함되어 있습니다.
+
+```bash
+python3 --version
+```
+
+## Quick Start
+
+템플릿 JSON으로 PPTX를 생성합니다.
+
+```bash
+python3 make_ppt.py deckspec_template.json -o output.pptx
+```
+
+생성되는 내부 OOXML 파일도 함께 보고 싶으면 `--dump-ooxml`을 사용합니다.
+
+```bash
+python3 make_ppt.py deckspec_template.json -o output.pptx --dump-ooxml output_ooxml
+```
+
+## Input Methods
+
+### 1. JSON File
+
+```bash
+python3 make_ppt.py deckspec_template.json -o output.pptx
+```
+
+### 2. stdin
+
+```bash
+cat deckspec_template.json | python3 make_ppt.py - -o output.pptx
+```
+
+### 3. JSON String
+
+```bash
+python3 make_ppt.py --json-string '{"deck_title":"Demo","design":{"theme":"canva_fresh_startup"},"slides":[{"layout":"takeaway","kicker":"Demo","title":"JSON 문자열 입력","bullets":["파일 없이 바로 생성","OOXML을 직접 만든 뒤 PPTX로 패키징"],"speaker_note":"demo"}]}' -o output.pptx
+```
+
+## Write A Fresh Template
+
+내장 샘플 DeckSpec을 새 JSON 템플릿 파일로 씁니다.
+
+```bash
+python3 make_ppt.py --write-template deckspec_template.json
+```
+
+## Validate The PPTX Package
+
+생성된 PPTX가 zip 패키지로 정상인지 확인합니다.
+
+```bash
+unzip -t output.pptx
+```
+
+macOS에서 QuickLook 썸네일 렌더링을 확인할 수도 있습니다.
+
+```bash
+qlmanage -t -s 1200 -o . output.pptx
+```
+
+## DeckSpec Shape
+
+기본 구조는 다음과 같습니다.
+
+```json
+{
+  "deck_title": "Deck title",
+  "subtitle": "Optional subtitle",
+  "design": {
+    "theme": "policy_brief",
+    "tone": "calm_analytical",
+    "density": "medium",
+    "visual_style": "clean_data_brief"
+  },
+  "slides": [
+    {
+      "layout": "title_summary",
+      "kicker": "Section label",
+      "title": "Slide title",
+      "bullets": ["Short bullet", "Short bullet"],
+      "speaker_note": "Optional speaker note"
+    }
+  ]
+}
+```
+
+## Supported Themes
+
+Use one of these values in `design.theme`.
+
+```text
+policy_brief
+executive_summary
+data_report
+canva_modern_pitch
+canva_warm_editorial
+canva_fresh_startup
+```
+
+The `canva_*` themes are not copied from Canva templates. They are Canva-like presentation style presets implemented with OOXML shapes, colors, and background motifs.
+
+## Supported Slide Layouts
+
+Use one of these values in each slide's `layout`.
+
+```text
+title_summary
+bullets
+metric_dashboard
+bar_comparison
+takeaway
+```
+
+## Supported Components
+
+### Metric Card
+
+Used with `metric_dashboard`.
+
+```json
+{
+  "type": "metric_card",
+  "label": "출생아 수",
+  "value": "2만6916명",
+  "delta": "+11.7%",
+  "context": "전년 동월 대비",
+  "emphasis": "primary"
+}
+```
+
+### Bar Chart
+
+Used with `bar_comparison`.
+
+```json
+{
+  "type": "bar_chart",
+  "title": "전년 동월 대비 증가율",
+  "unit": "%",
+  "data": [
+    { "label": "출생아 수", "value": 11.7 },
+    { "label": "혼인 건수", "value": 12.4 }
+  ],
+  "emphasis": "accent"
+}
+```
+
+## LLM Prompt For DeckSpec JSON
+
+다른 세션에서 LLM에게 DeckSpec JSON을 만들게 할 때는 아래 프롬프트를 사용하세요.
+
+LLM은 원문을 요약하고, 슬라이드 장수와 디자인을 판단한 뒤, 이 스크립트가 렌더링할 수 있는 JSON만 반환해야 합니다.
+
+```text
+You are a senior presentation strategist and information designer.
+
+Convert the source text into a DeckSpec JSON for the provided Python OOXML PPTX renderer.
+
+Return valid JSON only.
+Do not return markdown.
+Do not explain your choices outside the JSON.
+
+Rules:
+- Create 3 to 6 slides unless the source text clearly requires fewer or more.
+- Preserve important source numbers exactly.
+- Do not invent facts, sources, dates, numbers, company names, or claims.
+- Use concise Korean business presentation language.
+- Keep each bullet short enough for a slide.
+- Choose the most suitable design.theme from the allowed theme list.
+- Choose each slide.layout from the allowed layout list.
+- Use metric_card components for important headline numbers.
+- Use bar_chart components when comparing numeric values.
+- Use bullets when the slide is mostly explanatory.
+- Use takeaway for the final executive conclusion.
+- If a layout requires components, include components.
+- If a slide has components, it may also include bullets for supporting context.
+
+Allowed design.theme values:
+- policy_brief: sober public-policy or research brief
+- executive_summary: CEO/board-level concise business summary
+- data_report: analytical report with numbers and comparisons
+- canva_modern_pitch: dark modern pitch deck style
+- canva_warm_editorial: warm editorial/report style
+- canva_fresh_startup: fresh startup/product style
+
+Allowed slide.layout values:
+- title_summary
+- bullets
+- metric_dashboard
+- bar_comparison
+- takeaway
+
+Supported component types:
+- metric_card
+- bar_chart
+
+DeckSpec JSON schema:
+{
+  "deck_title": "string",
+  "subtitle": "string",
+  "design": {
+    "theme": "policy_brief | executive_summary | data_report | canva_modern_pitch | canva_warm_editorial | canva_fresh_startup",
+    "tone": "string",
+    "density": "low | medium | high",
+    "visual_style": "string"
+  },
+  "slides": [
+    {
+      "layout": "title_summary | bullets | metric_dashboard | bar_comparison | takeaway",
+      "kicker": "string",
+      "title": "string",
+      "bullets": ["string"],
+      "components": [
+        {
+          "type": "metric_card",
+          "label": "string",
+          "value": "string",
+          "delta": "string",
+          "context": "string",
+          "emphasis": "primary | accent | warning"
+        },
+        {
+          "type": "bar_chart",
+          "title": "string",
+          "unit": "string",
+          "data": [
+            { "label": "string", "value": 0 }
+          ],
+          "emphasis": "primary | accent | warning"
+        }
+      ],
+      "speaker_note": "string"
+    }
+  ]
+}
+
+Layout guidance:
+- Use title_summary for the opening slide.
+- Use metric_dashboard when the source has 2-3 important numbers.
+- Use bar_comparison when two or more numeric values should be compared.
+- Use bullets for concepts, causes, risks, or operating principles.
+- Use takeaway for the final conclusion.
+
+Source text:
+<<<
+PASTE_SOURCE_TEXT_HERE
+>>>
+```
+
+## Short LLM Prompt
+
+짧게 쓰고 싶으면 아래 버전을 사용하세요.
+
+```text
+아래 원문을 make_ppt.py용 DeckSpec JSON으로 변환해줘.
+반드시 유효한 JSON만 출력하고, 마크다운이나 설명은 출력하지 마.
+
+조건:
+- 3~6장 슬라이드로 구성
+- 중요한 숫자는 원문 그대로 보존
+- 없는 사실은 만들지 않기
+- design.theme은 아래 중 하나 선택:
+  policy_brief, executive_summary, data_report, canva_modern_pitch, canva_warm_editorial, canva_fresh_startup
+- slide.layout은 아래 중 하나 선택:
+  title_summary, bullets, metric_dashboard, bar_comparison, takeaway
+- 중요한 수치는 metric_card 컴포넌트로 표현
+- 비교 수치는 bar_chart 컴포넌트로 표현
+- 마지막 장은 takeaway 권장
+
+원문:
+<<<
+PASTE_SOURCE_TEXT_HERE
+>>>
+```
+
+## Theme Selection Guide
+
+LLM에게 테마를 고르게 할 때는 아래 기준을 쓰면 됩니다.
+
+```text
+policy_brief:
+정부, 정책, 리서치, 공공 데이터, 차분한 보고서
+
+executive_summary:
+CEO 보고, 이사회 보고, 경영진 의사결정 자료
+
+data_report:
+숫자, 비교, 지표, 성과 분석 중심 보고서
+
+canva_modern_pitch:
+스타트업 피치, AI/테크, 강한 첫인상, 어두운 모던 톤
+
+canva_warm_editorial:
+브랜드 스토리, 교육, 사회 이슈, 따뜻한 리포트 톤
+
+canva_fresh_startup:
+제품 소개, 성장 전략, 젊고 밝은 스타트업 톤
+```
+
+## Example LLM Output
+
+```json
+{
+  "deck_title": "AI 하네스 엔지니어링의 부상",
+  "subtitle": "AI 모델보다 운용 체계 설계가 성과를 좌우하는 시대로 전환",
+  "design": {
+    "theme": "executive_summary",
+    "tone": "calm_analytical",
+    "density": "medium",
+    "visual_style": "board_brief"
+  },
+  "slides": [
+    {
+      "layout": "title_summary",
+      "kicker": "핵심 개념",
+      "title": "하네스는 AI 에이전트의 운용 체계",
+      "bullets": [
+        "AI 에이전트를 감싸는 제어 구조",
+        "규칙·도구·샌드박스·피드백을 포함",
+        "모델이 아닌 일하는 환경 설계가 핵심"
+      ],
+      "speaker_note": "하네스를 AI 에이전트가 안전하고 예측 가능하게 작동하도록 만드는 운용 인프라로 정의한다."
+    },
+    {
+      "layout": "metric_dashboard",
+      "kicker": "성과 신호",
+      "title": "하네스 설계가 생산성 차이를 만든다",
+      "components": [
+        {
+          "type": "metric_card",
+          "label": "제품 코드",
+          "value": "100만 줄",
+          "delta": "5개월",
+          "context": "오픈AI 사례",
+          "emphasis": "primary"
+        },
+        {
+          "type": "metric_card",
+          "label": "PR 처리",
+          "value": "1500개",
+          "delta": "5개월간",
+          "context": "하네스 기반 개발 흐름",
+          "emphasis": "accent"
+        },
+        {
+          "type": "metric_card",
+          "label": "개발자 통합률",
+          "value": "60%",
+          "delta": "이미 업무 통합",
+          "context": "AI 활용 확산",
+          "emphasis": "warning"
+        }
+      ],
+      "speaker_note": "중요한 숫자를 카드형 지표로 강조한다."
+    }
+  ]
+}
+```
+
+## Notes
+
+- This renderer does not call an LLM.
+- This renderer does not use `python-pptx`.
+- It creates OOXML strings directly, writes files such as `ppt/slides/slide1.xml`, and packages them with Python's standard `zipfile`.
+- For production use, open the generated PPTX in PowerPoint, Keynote, or LibreOffice as a final compatibility check.
