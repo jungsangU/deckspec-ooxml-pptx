@@ -10,7 +10,7 @@ LLM은 발표 내용과 디자인 의도를 `DeckSpec JSON`으로 만들고, 이
 deckspec-ooxml-pptx/
 ├── make_ppt.py
 ├── base_ooxml/
-├── templete/
+├── template_profiles.json
 ├── README.md
 ├── 프롬프트.txt
 ├── requirements.txt
@@ -98,11 +98,11 @@ base_ooxml_corporate/
 
 현재 버전은 단일 안정 템플릿 `base_ooxml/`을 사용하고, 시각적 차이는 `design.theme`, `slide.layout`, `components`로 만듭니다.
 
-## PPTX Style Templates
+## Style Template Profiles
 
-`templete/` 폴더에 `.pptx` 파일을 넣으면 각 파일이 하나의 스타일 템플릿 후보가 됩니다.
+`template_profiles.json`은 스타일 템플릿 후보 목록입니다.
 
-이 렌더러는 해당 PPTX를 그대로 복사하지 않고, 내부 OOXML에서 대표 색상 팔레트와 스타일 신호를 읽어 현재 DeckSpec 렌더링에 적용합니다. 이렇게 하면 외부 템플릿의 이미지/마스터 관계 때문에 PowerPoint 복구 오류가 나는 위험을 줄이면서도, 파일별 톤을 다르게 쓸 수 있습니다.
+이 파일은 PPTX 원본을 한 번 분석해서 얻은 대표 색상, 배경 모티프, bullet 스타일, 레이아웃 변형 정보를 저장합니다. 런타임에는 PPTX 원본 파일이 필요하지 않습니다.
 
 기본 선택 방식은 `auto_random`입니다.
 
@@ -118,14 +118,17 @@ base_ooxml_corporate/
 동작 방식:
 
 ```text
-templete/*.pptx
-├── 대표 색상 추출
-├── 배경 모티프 후보 배정
-├── bullet 스타일 배정
+template_profiles.json
+├── 대표 색상
+├── 배경 모티프
+├── bullet 스타일
+├── layout_variants
 └── 현재 DeckSpec 슬라이드에 적용
 ```
 
-특정 템플릿을 고정하고 싶으면 파일명 또는 확장자를 뺀 파일명을 넣습니다.
+`layout_variants`는 같은 DeckSpec 레이아웃을 템플릿마다 다르게 그리도록 만듭니다. 예를 들어 `metric_dashboard`는 기본 카드형, 스코어보드형, 세로 테이블형, 스태거 카드형으로 달라질 수 있고, `bar_comparison`은 가로 막대, 세로 컬럼, lollipop 차트로 달라질 수 있습니다.
+
+특정 템플릿을 고정하고 싶으면 프로필의 `name` 값을 넣습니다.
 
 ```json
 {
@@ -466,9 +469,9 @@ Allowed design.theme values:
 - weather_risk: typhoon, heavy rain, heat wave, forecast, weather warning brief
 
 Allowed design.template values:
-- auto_random: randomly select one PPTX from templete/
-- none: do not use external PPTX style templates
-- a PPTX file name or stem from templete/: use that template profile
+- auto_random: randomly select one profile from template_profiles.json
+- none: do not use template profiles
+- a profile name from template_profiles.json: use that template profile
 
 Allowed slide.layout values:
 - title_cover
@@ -504,7 +507,7 @@ DeckSpec JSON schema:
   "subtitle": "string",
   "design": {
     "theme": "auto | policy_brief | executive_summary | data_report | canva_modern_pitch | canva_warm_editorial | canva_fresh_startup | crisis_brief | tech_architecture | strategy_board | weather_risk",
-    "template": "auto_random | none | template file name",
+    "template": "auto_random | none | template profile name",
     "tone": "string",
     "density": "low | medium | high",
     "visual_style": "string"

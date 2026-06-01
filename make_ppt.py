@@ -11,22 +11,11 @@ from pathlib import Path
 
 DEFAULT_OUTPUT = "deck_from_deckspec_ooxml.pptx"
 BASE_OOXML_DIR = Path(__file__).with_name("base_ooxml")
-TEMPLATE_DIR = Path(__file__).with_name("templete")
+TEMPLATE_PROFILES_PATH = Path(__file__).with_name("template_profiles.json")
 
 EMU_PER_INCH = 914400
 SLIDE_W = 12192000
 SLIDE_H = 6858000
-
-TEMPLATE_MOTIFS = [
-    ("data_blocks", "data_rows"),
-    ("editorial_frame", "editorial"),
-    ("diagonal_blocks", "outline"),
-    ("soft_circles", "cards"),
-    ("executive_frame", "numbered"),
-    ("weather_front", "weather"),
-    ("alert_band", "alert"),
-    ("blueprint", "outline"),
-]
 
 THEMES = {
     "policy_brief": {
@@ -267,92 +256,27 @@ def clamp_text(value, limit):
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
-def list_template_pptx():
-    if not TEMPLATE_DIR.exists():
+def load_template_profiles():
+    if not TEMPLATE_PROFILES_PATH.exists():
         return []
-    return sorted(path for path in TEMPLATE_DIR.glob("*.pptx") if not path.name.startswith("~$"))
-
-
-def color_distance_from_gray(color):
-    r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
-    return max(r, g, b) - min(r, g, b)
-
-
-def color_luminance(color):
-    r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-
-def light_tint(color, factor=0.88):
-    r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
-    vals = [round(channel + (255 - channel) * factor) for channel in (r, g, b)]
-    return "".join(f"{value:02X}" for value in vals)
-
-
-def extract_template_colors(path):
-    colors = []
-    try:
-        with zipfile.ZipFile(path) as deck:
-            for name in deck.namelist():
-                if not name.endswith(".xml"):
-                    continue
-                if not (name.startswith("ppt/theme/") or name.startswith("ppt/slides/") or name.startswith("ppt/slideMasters/")):
-                    continue
-                xml = deck.read(name).decode("utf-8", errors="ignore")
-                colors.extend(re.findall(r'<a:srgbClr[^>]* val="([0-9A-Fa-f]{6})"', xml))
-    except zipfile.BadZipFile:
-        return []
-
-    ranked = []
-    counts = {}
-    for color in (c.upper() for c in colors):
-        counts[color] = counts.get(color, 0) + 1
-    for color, count in counts.items():
-        lum = color_luminance(color)
-        if color in {"000000", "FFFFFF"}:
-            continue
-        if not (28 <= lum <= 235):
-            continue
-        if color_distance_from_gray(color) < 24:
-            continue
-        ranked.append((count, color_distance_from_gray(color), color))
-    ranked.sort(reverse=True)
-    return [color for _, __, color in ranked[:5]]
-
-
-def template_profile_from_pptx(path, index):
-    colors = extract_template_colors(path)
-    primary = colors[0] if colors else "2563EB"
-    accent = colors[1] if len(colors) > 1 else "0F766E"
-    warning = colors[2] if len(colors) > 2 else "EA580C"
-    motif, bullet_style = TEMPLATE_MOTIFS[index % len(TEMPLATE_MOTIFS)]
-    return {
-        "name": path.stem,
-        "path": str(path),
-        "primary": primary,
-        "accent": accent,
-        "warning": warning,
-        "surface_alt": light_tint(primary, 0.86),
-        "line": light_tint(primary, 0.72),
-        "motif": motif,
-        "bullet_style": bullet_style,
-    }
+    data = json.loads(TEMPLATE_PROFILES_PATH.read_text(encoding="utf-8"))
+    profiles = data.get("profiles", []) if isinstance(data, dict) else []
+    return [profile for profile in profiles if isinstance(profile, dict)]
 
 
 def select_template_profile(deckspec):
-    templates = list_template_pptx()
-    if not templates:
+    profiles = load_template_profiles()
+    if not profiles:
         return None
     design = deckspec.get("design", {}) if isinstance(deckspec, dict) else {}
     request = safe_text(design.get("template", "auto_random")).strip()
     if request in {"", "none", "off", "false"}:
         return None
     if request in {"auto", "auto_random", "random"}:
-        path = random.choice(templates)
-        return template_profile_from_pptx(path, templates.index(path))
-    for index, path in enumerate(templates):
-        if request == path.name or request == path.stem:
-            return template_profile_from_pptx(path, index)
+        return random.choice(profiles)
+    for profile in profiles:
+        if request in {safe_text(profile.get("name")), safe_text(profile.get("source_file"))}:
+            return profile
     return None
 
 
@@ -406,7 +330,8 @@ def theme_for(deckspec):
     theme = dict(THEMES.get(theme_name, THEMES["policy_brief"]))
     profile = select_template_profile(deckspec)
     if profile:
-        theme.update({k: v for k, v in profile.items() if k not in {"path"}})
+        style_keys = {"primary", "accent", "warning", "surface_alt", "line", "motif", "bullet_style", "layout_variants"}
+        theme.update({k: v for k, v in profile.items() if k in style_keys})
         design["selected_template"] = profile["name"]
         deckspec["design"] = design
     return theme
@@ -414,6 +339,13 @@ def theme_for(deckspec):
 
 def theme_color(theme, key):
     return theme.get(key, theme["primary"])
+
+
+def layout_variant(theme, layout, default="default"):
+    variants = theme.get("layout_variants", {})
+    if isinstance(variants, dict):
+        return variants.get(layout, default)
+    return default
 
 
 def srgb_fill_xml(color, alpha=None):
@@ -785,17 +717,62 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
     if not cards:
         return render_bullets(shapes, slide, theme, shape_id)
 
+    variant = layout_variant(theme, "metric_dashboard", "strip_cards")
+    if variant in {"scoreboard", "alert_cards"}:
+        main = cards[0]
+        accent = theme_color(theme, main.get("emphasis", "primary"))
+        shapes.append(text_box_xml(shape_id, "Hero Metric", emu(0.85), emu(1.95), emu(5.35), emu(2.35), [], fill=theme["surface_alt"], line=accent, radius=True))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Hero Metric Stripe", emu(0.85), emu(1.95), emu(5.35), emu(0.16), accent, accent))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Hero Metric Label", emu(1.2), emu(2.2), emu(4.6), emu(0.32), [paragraph_xml(clamp_text(main.get("label", ""), 28), 1100, theme["muted"], True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Hero Metric Value", emu(1.2), emu(2.58), emu(4.7), emu(0.8), [paragraph_xml(clamp_text(main.get("value", ""), 22), 3300, accent, True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Hero Metric Context", emu(1.2), emu(3.48), emu(4.6), emu(0.48), [paragraph_xml(clamp_text(main.get("delta", ""), 34), 1500, theme["text"], True), paragraph_xml(clamp_text(main.get("context", ""), 42), 950, theme["muted"])]))
+        shape_id += 1
+        y = 1.95
+        for card in cards[1:]:
+            accent = theme_color(theme, card.get("emphasis", "primary"))
+            shapes.append(text_box_xml(shape_id, "Side Metric", emu(6.55), emu(y), emu(5.65), emu(1.08), [], fill=theme["surface"], line=theme["line"], radius=True))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Side Metric Dot", emu(6.82), emu(y + 0.28), emu(0.18), emu(0.18), accent, accent, "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Side Metric Text", emu(7.12), emu(y + 0.14), emu(4.8), emu(0.72), [paragraph_xml(clamp_text(card.get("label", ""), 26), 1000, theme["muted"], True), paragraph_xml(clamp_text(card.get("value", ""), 24), 1900, accent, True)]))
+            shape_id += 1
+            y += 1.28
+        return render_bullets(shapes, slide, theme, shape_id, start_y=4.85, max_items=1, font_size=1350, text_limit=70)
+
+    if variant in {"vertical_stack", "compact_table"}:
+        y = 1.92
+        for idx, card in enumerate(cards):
+            accent = theme_color(theme, card.get("emphasis", "primary"))
+            shapes.append(text_box_xml(shape_id, "Metric Row", emu(0.95), emu(y), emu(11.1), emu(0.82), [], fill=theme["surface"], line=theme["line"], radius=False))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Metric Row Accent", emu(0.95), emu(y), emu(0.1), emu(0.82), accent, accent))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Metric Row Label", emu(1.25), emu(y + 0.17), emu(3.2), emu(0.36), [paragraph_xml(clamp_text(card.get("label", ""), 28), 1250, theme["text"], True)]))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Metric Row Value", emu(4.65), emu(y + 0.08), emu(3.0), emu(0.42), [paragraph_xml(clamp_text(card.get("value", ""), 24), 1850, accent, True)]))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Metric Row Context", emu(7.65), emu(y + 0.16), emu(4.0), emu(0.38), [paragraph_xml(clamp_text(card.get("delta") or card.get("context", ""), 46), 1100, theme["muted"])]))
+            shape_id += 1
+            y += 0.98
+        return render_bullets(shapes, slide, theme, shape_id, start_y=5.05, max_items=1, font_size=1300, text_limit=70)
+
     card_w = 3.72
     x_positions = [0.8, 4.81, 8.82]
+    y_offsets = [0, 0.18, 0] if variant == "staggered_cards" else [0, 0, 0]
     for idx, card in enumerate(cards):
         accent = theme_color(theme, card.get("emphasis", "primary"))
         x = x_positions[idx]
+        y0 = 2.0 + y_offsets[idx]
         shapes.append(
             text_box_xml(
                 shape_id,
                 "Metric Card",
                 emu(x),
-                emu(2.0),
+                emu(y0),
                 emu(card_w),
                 emu(2.35),
                 [],
@@ -805,14 +782,14 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
             )
         )
         shape_id += 1
-        shapes.append(shape_xml(shape_id, "Metric Accent", emu(x), emu(2.0), emu(0.08), emu(2.35), accent, accent))
+        shapes.append(shape_xml(shape_id, "Metric Accent", emu(x), emu(y0), emu(0.08), emu(2.35), accent, accent))
         shape_id += 1
         shapes.append(
             text_box_xml(
                 shape_id,
                 "Metric Label",
                 emu(x + 0.28),
-                emu(2.18),
+                emu(y0 + 0.18),
                 emu(card_w - 0.45),
                 emu(0.35),
                 [paragraph_xml(clamp_text(card.get("label", ""), 28), 1150, theme["muted"], True)],
@@ -824,7 +801,7 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
                 shape_id,
                 "Metric Value",
                 emu(x + 0.28),
-                emu(2.62),
+                emu(y0 + 0.62),
                 emu(card_w - 0.45),
                 emu(0.66),
                 [paragraph_xml(clamp_text(card.get("value", ""), 22), 2800, accent, True)],
@@ -836,7 +813,7 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
                 shape_id,
                 "Metric Delta",
                 emu(x + 0.28),
-                emu(3.3),
+                emu(y0 + 1.3),
                 emu(card_w - 0.45),
                 emu(0.42),
                 [paragraph_xml(clamp_text(card.get("delta", ""), 24), 1600, theme["text"], True)],
@@ -848,7 +825,7 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
                 shape_id,
                 "Metric Context",
                 emu(x + 0.28),
-                emu(3.78),
+                emu(y0 + 1.78),
                 emu(card_w - 0.45),
                 emu(0.34),
                 [paragraph_xml(clamp_text(card.get("context", ""), 42), 1050, theme["muted"])],
@@ -865,6 +842,7 @@ def render_bar_comparison(shapes, slide, theme, shape_id):
     data = chart.get("data", [])[:5]
     values = [float(item.get("value", 0)) for item in data if isinstance(item.get("value", 0), (int, float))]
     max_value = max(values) if values else 1
+    variant = layout_variant(theme, "bar_comparison", "horizontal_bars")
 
     shapes.append(
         text_box_xml(
@@ -878,6 +856,48 @@ def render_bar_comparison(shapes, slide, theme, shape_id):
         )
     )
     shape_id += 1
+
+    if variant in {"vertical_columns", "split_panel"}:
+        accent = theme_color(theme, chart.get("emphasis", "primary"))
+        chart_x, chart_y, chart_w, chart_h = 1.1, 2.55, 10.8, 2.0
+        col_w = chart_w / max(len(data), 1)
+        for idx, item in enumerate(data):
+            label = clamp_text(item.get("label", ""), 12)
+            value = float(item.get("value", 0))
+            unit = safe_text(chart.get("unit", ""))
+            h = max(0.18, chart_h * value / max_value)
+            x = chart_x + idx * col_w + 0.25
+            y = chart_y + chart_h - h
+            fill = accent if idx % 2 == 0 else theme["accent"]
+            shapes.append(shape_xml(shape_id, "Column Track", emu(x), emu(chart_y), emu(col_w - 0.5), emu(chart_h), theme["surface"], theme["line"], "rect"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Column Value", emu(x), emu(y), emu(col_w - 0.5), emu(h), fill, fill, "rect"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Column Number", emu(x - 0.1), emu(y - 0.32), emu(col_w), emu(0.28), [paragraph_xml(f"{value:g}{unit}", 850, fill, True)]))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Column Label", emu(x - 0.12), emu(chart_y + chart_h + 0.12), emu(col_w), emu(0.32), [paragraph_xml(label, 850, theme["muted"], True)]))
+            shape_id += 1
+        return render_bullets(shapes, slide, theme, shape_id, start_y=5.15, max_items=1, box_h=0.52, step=0.62, font_size=1250, text_limit=64)
+
+    if variant == "lollipop":
+        accent = theme_color(theme, chart.get("emphasis", "primary"))
+        y = 2.55
+        x0, x1 = 2.25, 10.5
+        for item in data:
+            label = clamp_text(item.get("label", ""), 18)
+            value = float(item.get("value", 0))
+            unit = safe_text(chart.get("unit", ""))
+            x = x0 + (x1 - x0) * value / max_value
+            shapes.append(text_box_xml(shape_id, "Lollipop Label", emu(0.9), emu(y - 0.12), emu(1.5), emu(0.3), [paragraph_xml(label, 1100, theme["text"], True)]))
+            shape_id += 1
+            shapes.append(line_segment_xml(shape_id, "Lollipop Stem", emu(x0), emu(y + 0.08), emu(x), emu(y + 0.08), theme["line"], 12700, "dash"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Lollipop Dot", emu(x - 0.11), emu(y - 0.03), emu(0.22), emu(0.22), accent, "FFFFFF", "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Lollipop Number", emu(x + 0.18), emu(y - 0.12), emu(1.15), emu(0.3), [paragraph_xml(f"{value:g}{unit}", 1050, accent, True)]))
+            shape_id += 1
+            y += 0.62
+        return render_bullets(shapes, slide, theme, shape_id, start_y=5.05, max_items=1, box_h=0.52, step=0.62, font_size=1250, text_limit=64)
 
     y = 2.5
     bar_x = 2.65
@@ -1240,6 +1260,35 @@ def render_title_cover(shapes, slide, theme, shape_id):
     kicker = slide.get("kicker") or "Presentation"
     title = slide.get("title") or "Untitled Deck"
     subtitle = slide.get("subtitle") or ""
+    variant = layout_variant(theme, "title_cover", "left_panel")
+    if variant in {"centered_badge", "weather_alert"}:
+        shapes.append(translucent_shape_xml(shape_id, "Cover Badge", emu(2.0), emu(1.15), emu(9.35), emu(4.75), theme["surface_alt"], 64000, "roundRect"))
+        shape_id += 1
+        shapes.append(translucent_shape_xml(shape_id, "Cover Halo", emu(9.15), emu(0.65), emu(2.1), emu(2.1), theme["accent"], 16000, "ellipse"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Cover Kicker", emu(3.0), emu(1.78), emu(7.2), emu(0.36), [paragraph_xml(clamp_text(kicker, 44), 1200, theme["primary"], True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Cover Title", emu(2.65), emu(2.28), emu(8.05), emu(1.55), [paragraph_xml(clamp_text(title, 50), 3400, theme["text"], True)]))
+        shape_id += 1
+        if subtitle:
+            shapes.append(text_box_xml(shape_id, "Cover Subtitle", emu(3.0), emu(4.18), emu(7.3), emu(0.62), [paragraph_xml(clamp_text(subtitle, 76), 1450, theme["muted"])]))
+            shape_id += 1
+        return shape_id
+
+    if variant in {"diagonal_hero", "executive_memo"}:
+        shapes.append(translucent_shape_xml(shape_id, "Cover Diagonal", emu(7.7), emu(0.7), emu(5.1), emu(5.5), theme["primary"], 17000, "parallelogram"))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Cover Top Rule", emu(0.85), emu(1.25), emu(4.1), emu(0.08), theme["accent"], theme["accent"]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Cover Kicker", emu(0.9), emu(1.58), emu(5.8), emu(0.36), [paragraph_xml(clamp_text(kicker, 44), 1200, theme["primary"], True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Cover Title", emu(0.85), emu(2.02), emu(7.6), emu(1.85), [paragraph_xml(clamp_text(title, 54), 3600, theme["text"], True)]))
+        shape_id += 1
+        if subtitle:
+            shapes.append(text_box_xml(shape_id, "Cover Subtitle", emu(0.9), emu(4.12), emu(6.8), emu(0.7), [paragraph_xml(clamp_text(subtitle, 76), 1450, theme["muted"])]))
+            shape_id += 1
+        return shape_id
+
     shapes.append(translucent_shape_xml(shape_id, "Cover Wash", emu(0.72), emu(1.15), emu(11.85), emu(4.85), theme["surface_alt"], 62000, "roundRect"))
     shape_id += 1
     shapes.append(shape_xml(shape_id, "Cover Accent Bar", emu(0.72), emu(1.15), emu(0.16), emu(4.85), theme["primary"], theme["primary"]))
@@ -1289,6 +1338,31 @@ def render_title_cover(shapes, slide, theme, shape_id):
 
 
 def render_takeaway(shapes, slide, theme, shape_id):
+    variant = layout_variant(theme, "takeaway", "summary_panel")
+    bullets = slide.get("bullets", [])[:4]
+    if variant in {"quote_band", "forecast_brief"}:
+        shapes.append(translucent_shape_xml(shape_id, "Takeaway Band", emu(0), emu(2.05), SLIDE_W, emu(2.45), theme["surface_alt"], 60000))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Takeaway Rule", emu(0.85), emu(2.28), emu(0.1), emu(1.95), theme["primary"], theme["primary"]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Takeaway Head", emu(1.2), emu(2.25), emu(4.0), emu(0.42), [paragraph_xml("핵심 메시지", 1300, theme["primary"], True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Takeaway Quote", emu(1.2), emu(2.85), emu(10.4), emu(1.25), [paragraph_xml(clamp_text(bullets[0] if bullets else slide.get("title", ""), 78), 2300, theme["text"], True)]))
+        shape_id += 1
+        if len(bullets) > 1:
+            return render_bullets(shapes, {"bullets": bullets[1:]}, theme, shape_id, start_y=4.85, max_items=2, box_h=0.48, step=0.56, font_size=1200, text_limit=70)
+        return shape_id
+
+    if variant in {"full_bleed_callout", "decision_memo"}:
+        shapes.append(text_box_xml(shape_id, "Decision Panel", emu(0.85), emu(1.9), emu(5.5), emu(3.55), [paragraph_xml("결론", 1300, theme["primary"], True), paragraph_xml(clamp_text(slide.get("title", "Takeaway"), 44), 2500, theme["text"], True)], fill=theme["surface_alt"], line=theme["line"], radius=True))
+        shape_id += 1
+        y = 2.05
+        for idx, bullet in enumerate(bullets):
+            shapes.append(text_box_xml(shape_id, "Decision Item", emu(6.65), emu(y), emu(5.3), emu(0.62), [paragraph_xml(f"{idx + 1}. {clamp_text(bullet, 58)}", 1350, theme["text"], True)], fill=theme["surface"], line=theme["line"], radius=False))
+            shape_id += 1
+            y += 0.78
+        return shape_id
+
     shapes.append(
         text_box_xml(
             shape_id,
@@ -1298,7 +1372,7 @@ def render_takeaway(shapes, slide, theme, shape_id):
             emu(11.65),
             emu(3.05),
             [paragraph_xml("핵심 메시지", 1300, theme["primary"], True)]
-            + [paragraph_xml("• " + clamp_text(b, 82), 1900, theme["text"]) for b in slide.get("bullets", [])[:4]],
+            + [paragraph_xml("• " + clamp_text(b, 82), 1900, theme["text"]) for b in bullets],
             fill=theme["surface_alt"],
             line=theme["line"],
             radius=True,

@@ -165,11 +165,12 @@ Examples:
 
 Choose "design.template":
 
-- auto_random: randomly select one PPTX style profile from templete/
-- none: do not use external PPTX style templates
-- exact template file name or stem: use that specific template profile
+- auto_random: randomly select one style profile from template_profiles.json
+- none: do not use template profiles
+- exact template profile name: use that specific template profile
 
 Default to "auto_random" so the renderer can vary the visual template across runs.
+Template profiles may change colors, background motifs, bullet styles, and layout variants. The same slide.layout can therefore render differently depending on the selected template.
 
 ============================================================
 5. Supported Slide Layouts

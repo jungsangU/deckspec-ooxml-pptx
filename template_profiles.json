@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "name": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2010",
+      "source_file": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2010.pptx",
+      "primary": "1B4DAC",
+      "accent": "123374",
+      "warning": "FF6600",
+      "surface_alt": "DFE6F3",
+      "line": "BFCDE8",
+      "motif": "data_blocks",
+      "bullet_style": "data_rows",
+      "layout_variants": {
+        "title_cover": "left_panel",
+        "metric_dashboard": "strip_cards",
+        "bar_comparison": "horizontal_bars",
+        "takeaway": "summary_panel"
+      },
+      "palette": ["1B4DAC", "123374", "FF6600", "3F75E1", "023141"]
+    },
+    {
+      "name": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2017",
+      "source_file": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2017.pptx",
+      "primary": "9BB7DD",
+      "accent": "7B1B29",
+      "warning": "FF6600",
+      "surface_alt": "F1F5FA",
+      "line": "E3EBF5",
+      "motif": "editorial_frame",
+      "bullet_style": "editorial",
+      "layout_variants": {
+        "title_cover": "editorial_split",
+        "metric_dashboard": "vertical_stack",
+        "bar_comparison": "lollipop",
+        "takeaway": "quote_band"
+      },
+      "palette": ["9BB7DD", "7B1B29", "FF6600", "FF0000", "C22F37"]
+    },
+    {
+      "name": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2020",
+      "source_file": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2020.pptx",
+      "primary": "FF6600",
+      "accent": "FF0000",
+      "warning": "00B0F0",
+      "surface_alt": "FFEADB",
+      "line": "FFD4B8",
+      "motif": "diagonal_blocks",
+      "bullet_style": "outline",
+      "layout_variants": {
+        "title_cover": "diagonal_hero",
+        "metric_dashboard": "scoreboard",
+        "bar_comparison": "vertical_columns",
+        "takeaway": "full_bleed_callout"
+      },
+      "palette": ["FF6600", "FF0000", "00B0F0", "3366FF", "4472C4"]
+    },
+    {
+      "name": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2021",
+      "source_file": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2021.pptx",
+      "primary": "198B80",
+      "accent": "8CDCDD",
+      "warning": "273353",
+      "surface_alt": "DFEFED",
+      "line": "BFDFDB",
+      "motif": "soft_circles",
+      "bullet_style": "cards",
+      "layout_variants": {
+        "title_cover": "centered_badge",
+        "metric_dashboard": "staggered_cards",
+        "bar_comparison": "rounded_bars",
+        "takeaway": "soft_panel"
+      },
+      "palette": ["198B80", "8CDCDD", "273353", "FFCCCC", "FF6600"]
+    },
+    {
+      "name": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2025",
+      "source_file": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2025.pptx",
+      "primary": "239B82",
+      "accent": "FF6600",
+      "warning": "145849",
+      "surface_alt": "E0F1EE",
+      "line": "C1E3DC",
+      "motif": "executive_frame",
+      "bullet_style": "numbered",
+      "layout_variants": {
+        "title_cover": "executive_memo",
+        "metric_dashboard": "compact_table",
+        "bar_comparison": "split_panel",
+        "takeaway": "decision_memo"
+      },
+      "palette": ["239B82", "FF6600", "145849", "FCBC85", "FDCC9B"]
+    },
+    {
+      "name": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2028",
+      "source_file": "파워포인트-템플릿-원본-파일-다운로드-받기-free-ppt-template-2028.pptx",
+      "primary": "ADB5C8",
+      "accent": "6C53E3",
+      "warning": "A089FF",
+      "surface_alt": "F4F5F7",
+      "line": "E8EAF0",
+      "motif": "weather_front",
+      "bullet_style": "weather",
+      "layout_variants": {
+        "title_cover": "weather_alert",
+        "metric_dashboard": "alert_cards",
+        "bar_comparison": "vertical_columns",
+        "takeaway": "forecast_brief"
+      },
+      "palette": ["ADB5C8", "6C53E3", "A089FF", "FF0000", "44546A"]
+    }
+  ]
+}
