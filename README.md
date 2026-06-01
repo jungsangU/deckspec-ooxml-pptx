@@ -9,9 +9,12 @@ LLM은 발표 내용과 디자인 의도를 `DeckSpec JSON`으로 만들고, 이
 ```text
 deckspec-ooxml-pptx/
 ├── make_ppt.py
-├── deckspec_template.json
+├── base_ooxml/
 ├── README.md
-└── requirements.txt
+├── requirements.txt
+└── test/
+    ├── deckspec_template.json
+    └── ai_harness_deckspec.json
 ```
 
 ## Requirements
@@ -24,18 +27,87 @@ Python 3.9 이상을 권장합니다.
 python3 --version
 ```
 
+## Runtime Template
+
+`base_ooxml/`은 필수 런타임 템플릿입니다.
+
+이 폴더에는 PowerPoint가 안정적으로 여는 기본 OOXML 골격이 들어 있습니다.
+
+```text
+base_ooxml/
+└── ppt/
+    ├── theme/
+    ├── slideLayouts/
+    ├── slideMasters/
+    ├── notesMasters/
+    ├── presProps.xml
+    ├── viewProps.xml
+    └── tableStyles.xml
+```
+
+`make_ppt.py`는 매번 새 슬라이드 XML을 생성한 뒤, `base_ooxml/`의 안정적인 마스터/레이아웃/테마/프레젠테이션 속성 파일과 함께 `.pptx`로 패키징합니다.
+
+`base_ooxml/`을 삭제하면 스크립트의 최소 OOXML fallback이 동작할 수 있지만, PowerPoint에서 복구 경고가 뜰 가능성이 커집니다. 실사용 배포에는 `base_ooxml/`을 반드시 포함하세요.
+
+### Does `base_ooxml/` Lock The Design?
+
+아니요. `base_ooxml/`은 디자인을 고정하는 용도라기보다, PowerPoint가 신뢰하는 문서 골격을 제공하는 용도입니다.
+
+실제 슬라이드의 디자인과 패턴은 주로 아래에서 결정됩니다.
+
+```text
+DeckSpec JSON
+├── design.theme
+├── slide.layout
+├── components
+└── bullets / metrics / chart data
+
+make_ppt.py
+├── theme presets
+├── background motifs
+├── metric card renderer
+├── bar chart renderer
+└── slide layout renderer
+```
+
+즉 `base_ooxml/`은 문서의 뼈대이고, 슬라이드별 배경 도형, 카드, 막대그래프, 색상, 텍스트, 레이아웃은 `make_ppt.py`가 생성하는 `ppt/slides/slideN.xml`에서 계속 바뀝니다.
+
+다만 `base_ooxml/` 안의 `theme1.xml`, `slideMaster1.xml`, `slideLayout1.xml`이 기본 폰트/테마/마스터 정보를 제공하므로, 아주 깊은 수준의 PowerPoint 기본 스타일은 어느 정도 영향을 줄 수 있습니다. 더 강한 브랜드 스타일이 필요하면 `base_ooxml/`을 여러 개 두고 선택하게 만들 수 있습니다.
+
+예:
+
+```text
+base_ooxml/
+base_ooxml_modern/
+base_ooxml_editorial/
+base_ooxml_corporate/
+```
+
+그리고 DeckSpec에서 이렇게 고르게 만들 수 있습니다.
+
+```json
+{
+  "design": {
+    "base_template": "base_ooxml_modern",
+    "theme": "canva_modern_pitch"
+  }
+}
+```
+
+현재 버전은 단일 안정 템플릿 `base_ooxml/`을 사용하고, 시각적 차이는 `design.theme`, `slide.layout`, `components`로 만듭니다.
+
 ## Quick Start
 
 템플릿 JSON으로 PPTX를 생성합니다.
 
 ```bash
-python3 make_ppt.py deckspec_template.json -o output.pptx
+python3 make_ppt.py test/deckspec_template.json -o output.pptx
 ```
 
 생성되는 내부 OOXML 파일도 함께 보고 싶으면 `--dump-ooxml`을 사용합니다.
 
 ```bash
-python3 make_ppt.py deckspec_template.json -o output.pptx --dump-ooxml output_ooxml
+python3 make_ppt.py test/deckspec_template.json -o output.pptx --dump-ooxml output_ooxml
 ```
 
 ## Input Methods
@@ -43,13 +115,13 @@ python3 make_ppt.py deckspec_template.json -o output.pptx --dump-ooxml output_oo
 ### 1. JSON File
 
 ```bash
-python3 make_ppt.py deckspec_template.json -o output.pptx
+python3 make_ppt.py test/deckspec_template.json -o output.pptx
 ```
 
 ### 2. stdin
 
 ```bash
-cat deckspec_template.json | python3 make_ppt.py - -o output.pptx
+cat test/deckspec_template.json | python3 make_ppt.py - -o output.pptx
 ```
 
 ### 3. JSON String
@@ -63,7 +135,7 @@ python3 make_ppt.py --json-string '{"deck_title":"Demo","design":{"theme":"canva
 내장 샘플 DeckSpec을 새 JSON 템플릿 파일로 씁니다.
 
 ```bash
-python3 make_ppt.py --write-template deckspec_template.json
+python3 make_ppt.py --write-template test/deckspec_template.json
 ```
 
 ## Validate The PPTX Package
@@ -264,32 +336,6 @@ Layout guidance:
 - Use takeaway for the final conclusion.
 
 Source text:
-<<<
-PASTE_SOURCE_TEXT_HERE
->>>
-```
-
-## Short LLM Prompt
-
-짧게 쓰고 싶으면 아래 버전을 사용하세요.
-
-```text
-아래 원문을 make_ppt.py용 DeckSpec JSON으로 변환해줘.
-반드시 유효한 JSON만 출력하고, 마크다운이나 설명은 출력하지 마.
-
-조건:
-- 3~6장 슬라이드로 구성
-- 중요한 숫자는 원문 그대로 보존
-- 없는 사실은 만들지 않기
-- design.theme은 아래 중 하나 선택:
-  policy_brief, executive_summary, data_report, canva_modern_pitch, canva_warm_editorial, canva_fresh_startup
-- slide.layout은 아래 중 하나 선택:
-  title_summary, bullets, metric_dashboard, bar_comparison, takeaway
-- 중요한 수치는 metric_card 컴포넌트로 표현
-- 비교 수치는 bar_chart 컴포넌트로 표현
-- 마지막 장은 takeaway 권장
-
-원문:
 <<<
 PASTE_SOURCE_TEXT_HERE
 >>>

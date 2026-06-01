@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 DEFAULT_OUTPUT = "deck_from_deckspec_ooxml.pptx"
+BASE_OOXML_DIR = Path(__file__).with_name("base_ooxml")
 
 EMU_PER_INCH = 914400
 SLIDE_W = 12192000
@@ -230,7 +231,7 @@ def paragraph_xml(text, size=2200, color="374151", bold=False):
 
 def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, radius=False):
     fill_xml = '<a:noFill/>' if fill is None else srgb_fill_xml(fill)
-    line_xml = "<a:ln/>" if line is None else f'<a:ln w="12700"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>'
+    line_xml = "<a:ln><a:noFill/></a:ln>" if line is None else f'<a:ln w="12700"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>'
     geom = (
         '<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 9000"/></a:avLst></a:prstGeom>'
         if radius
@@ -249,7 +250,7 @@ def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, r
       </p:sp>"""
     return f"""
       <p:sp>
-        <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
         <p:spPr>
           <a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm>
           {geom}
@@ -265,7 +266,7 @@ def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, r
 
 
 def shape_xml(shape_id, name, x, y, w, h, fill, line=None, shape="rect"):
-    line_xml = "<a:ln/>" if line is None else f'<a:ln w="12700"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>'
+    line_xml = "<a:ln><a:noFill/></a:ln>" if line is None else f'<a:ln w="12700"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>'
     return f"""
       <p:sp>
         <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
@@ -624,8 +625,12 @@ def content_types_xml(slide_count):
   <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
   <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
   <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/>
+  <Override PartName="/ppt/viewProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"/>
+  <Override PartName="/ppt/tableStyles.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"/>
   <Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
   <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+  <Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>
   <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
   {overrides}
 </Types>"""
@@ -641,30 +646,48 @@ def root_rels_xml():
 
 
 def presentation_xml(slide_count):
-    slide_ids = "\n".join(f'<p:sldId id="{255 + i}" r:id="rId{i}"/>' for i in range(1, slide_count + 1))
+    slide_ids = "\n".join(f'<p:sldId id="{255 + i}" r:id="rId{i + 1}"/>' for i in range(1, slide_count + 1))
+    notes_master_id = slide_count + 2
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-                xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId{slide_count + 1}"/></p:sldMasterIdLst>
+                xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                saveSubsetFonts="1" autoCompressPictures="0">
+  <p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>
   <p:sldIdLst>{slide_ids}</p:sldIdLst>
-  <p:sldSz cx="{SLIDE_W}" cy="{SLIDE_H}" type="wide"/>
-  <p:notesSz cx="6858000" cy="9144000"/>
-  <p:defaultTextStyle/>
+  <p:notesMasterIdLst><p:notesMasterId r:id="rId{notes_master_id}"/></p:notesMasterIdLst>
+  <p:sldSz cx="{SLIDE_W}" cy="{SLIDE_H}"/>
+  <p:notesSz cx="6858000" cy="{SLIDE_W}"/>
+  <p:defaultTextStyle>
+    <a:lvl1pPr marL="0" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr>
+    <a:lvl2pPr marL="457200" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl2pPr>
+    <a:lvl3pPr marL="914400" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl3pPr>
+    <a:lvl4pPr marL="1371600" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl4pPr>
+    <a:lvl5pPr marL="1828800" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl5pPr>
+    <a:lvl6pPr marL="2286000" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl6pPr>
+    <a:lvl7pPr marL="2743200" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl7pPr>
+    <a:lvl8pPr marL="3200400" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl8pPr>
+    <a:lvl9pPr marL="3657600" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl9pPr>
+  </p:defaultTextStyle>
 </p:presentation>"""
 
 
 def presentation_rels_xml(slide_count):
     rels = [
-        f'<Relationship Id="rId{i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide{i}.xml"/>'
-        for i in range(1, slide_count + 1)
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>'
     ]
-    rels.append(
-        f'<Relationship Id="rId{slide_count + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>'
+    rels.extend(
+        f'<Relationship Id="rId{i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide{i}.xml"/>'
+        for i in range(1, slide_count + 1)
     )
-    rels.append(
-        f'<Relationship Id="rId{slide_count + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>'
-    )
+    base = slide_count + 2
+    rels.extend([
+        f'<Relationship Id="rId{base}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster" Target="notesMasters/notesMaster1.xml"/>',
+        f'<Relationship Id="rId{base + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/>',
+        f'<Relationship Id="rId{base + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/>',
+        f'<Relationship Id="rId{base + 3}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>',
+        f'<Relationship Id="rId{base + 4}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" Target="tableStyles.xml"/>',
+    ])
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   {' '.join(rels)}
@@ -727,7 +750,10 @@ def theme_xml(theme):
       <a:accent5><a:srgbClr val="7C3AED"/></a:accent5><a:accent6><a:srgbClr val="2563EB"/></a:accent6>
       <a:hlink><a:srgbClr val="{theme["primary"]}"/></a:hlink><a:folHlink><a:srgbClr val="{theme["accent"]}"/></a:folHlink>
     </a:clrScheme>
-    <a:fontScheme name="Aptos"><a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface="Malgun Gothic"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/><a:ea typeface="Malgun Gothic"/></a:minorFont></a:fontScheme>
+    <a:fontScheme name="Aptos">
+      <a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface="Malgun Gothic"/><a:cs typeface="Aptos"/></a:majorFont>
+      <a:minorFont><a:latin typeface="Aptos"/><a:ea typeface="Malgun Gothic"/><a:cs typeface="Aptos"/></a:minorFont>
+    </a:fontScheme>
     <a:fmtScheme name="Simple">
       <a:fillStyleLst>
         <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
@@ -751,6 +777,8 @@ def theme_xml(theme):
       </a:bgFillStyleLst>
     </a:fmtScheme>
   </a:themeElements>
+  <a:objectDefaults/>
+  <a:extraClrSchemeLst/>
 </a:theme>"""
 
 
@@ -807,12 +835,21 @@ def build_ooxml_files(deckspec):
         "docProps/app.xml": app_xml(len(slides)),
         "ppt/presentation.xml": presentation_xml(len(slides)),
         "ppt/_rels/presentation.xml.rels": presentation_rels_xml(len(slides)),
-        "ppt/slideMasters/slideMaster1.xml": slide_master_xml(),
-        "ppt/slideMasters/_rels/slideMaster1.xml.rels": slide_master_rels_xml(),
-        "ppt/slideLayouts/slideLayout1.xml": slide_layout_xml(),
-        "ppt/slideLayouts/_rels/slideLayout1.xml.rels": slide_layout_rels_xml(),
-        "ppt/theme/theme1.xml": theme_xml(theme),
     }
+    if BASE_OOXML_DIR.exists():
+        for path in BASE_OOXML_DIR.rglob("*"):
+            if path.is_file():
+                files[str(path.relative_to(BASE_OOXML_DIR))] = path.read_text(encoding="utf-8")
+    else:
+        files.update(
+            {
+                "ppt/slideMasters/slideMaster1.xml": slide_master_xml(),
+                "ppt/slideMasters/_rels/slideMaster1.xml.rels": slide_master_rels_xml(),
+                "ppt/slideLayouts/slideLayout1.xml": slide_layout_xml(),
+                "ppt/slideLayouts/_rels/slideLayout1.xml.rels": slide_layout_rels_xml(),
+                "ppt/theme/theme1.xml": theme_xml(theme),
+            }
+        )
     for idx, slide in enumerate(slides, 1):
         files[f"ppt/slides/slide{idx}.xml"] = make_slide_xml(slide, idx, theme)
         files[f"ppt/slides/_rels/slide{idx}.xml.rels"] = slide_rels_xml()

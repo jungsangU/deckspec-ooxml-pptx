@@ -1,0 +1,125 @@
+{
+  "deck_title": "한화에어로스페이스 대전공장 폭발 사고",
+  "subtitle": "2026년 6월 1일 발생한 인명 피해와 사고 수습·조사 현황",
+  "design": {
+    "theme": "policy_brief",
+    "tone": "calm_analytical",
+    "density": "medium",
+    "visual_style": "incident_brief"
+  },
+  "slides": [
+    {
+      "layout": "title_summary",
+      "kicker": "사고 개요",
+      "title": "대전공장 폭발로 7명 사상",
+      "bullets": [
+        "6월 1일 오전 10시 59분 폭발 발생",
+        "대전 유성구 외삼동 대전공장 사고",
+        "5명 사망, 1명 중상, 1명 경상",
+        "56동 세척 공실에서 폭발 파악"
+      ],
+      "speaker_note": "사고 발생 시각, 장소, 피해 규모, 초기 파악된 폭발 지점을 요약한다."
+    },
+    {
+      "layout": "metric_dashboard",
+      "kicker": "핵심 피해 지표",
+      "title": "인명 피해와 소방 대응 규모",
+      "components": [
+        {
+          "type": "metric_card",
+          "label": "사망자",
+          "value": "5명",
+          "delta": "전원 사업장 내 발견",
+          "context": "생산팀 소속 현장 근로자",
+          "emphasis": "warning"
+        },
+        {
+          "type": "metric_card",
+          "label": "부상자",
+          "value": "2명",
+          "delta": "1명 중상·1명 경상",
+          "context": "자력 탈출 후 구조",
+          "emphasis": "accent"
+        },
+        {
+          "type": "metric_card",
+          "label": "신고",
+          "value": "30여건",
+          "delta": "동시간대 119 신고",
+          "context": "폭발음·연기 신고",
+          "emphasis": "primary"
+        }
+      ],
+      "speaker_note": "피해 규모와 신고 상황을 핵심 숫자로 정리해 사고의 중대성을 전달한다."
+    },
+    {
+      "layout": "bar_comparison",
+      "kicker": "사망자 구성",
+      "title": "사망자는 계약직 2명과 정규직 3명",
+      "components": [
+        {
+          "type": "bar_chart",
+          "title": "사망자 고용 형태",
+          "unit": "명",
+          "data": [
+            {
+              "label": "계약직",
+              "value": 2
+            },
+            {
+              "label": "정규직",
+              "value": 3
+            }
+          ],
+          "emphasis": "warning"
+        }
+      ],
+      "bullets": [
+        "계약직 2명은 20대 근로자",
+        "정규직은 50대 2명·30대 1명",
+        "모두 오전 8시부터 근무 시작",
+        "규정에 따른 방염복 착용"
+      ],
+      "speaker_note": "사망자 고용 형태와 연령대, 근무 및 보호장비 착용 사실을 있는 그대로 제시한다."
+    },
+    {
+      "layout": "bullets",
+      "kicker": "수습 및 조사",
+      "title": "화재 진압 후 원인 조사 착수",
+      "bullets": [
+        "오전 11시 17분 소방 대응 1단계 발령",
+        "인력 100여명·장비 30여대 투입",
+        "화재 발생 50분 만에 초진",
+        "오후 1시 7분 완진",
+        "오후 1시 8분 대응 1단계 해제"
+      ],
+      "speaker_note": "소방 대응의 주요 시간표와 투입 자원을 중심으로 사고 수습 흐름을 설명한다."
+    },
+    {
+      "layout": "bullets",
+      "kicker": "사고 원인 단서",
+      "title": "로켓 추진제 세척 공정 중 폭발 추정",
+      "bullets": [
+        "폭발 지점은 56동 세척 공실",
+        "화약 묻은 공구 세척 중 발생 추정",
+        "지상 1층 544㎡ 건물 1동 전소",
+        "건물 구조물 붕괴로 즉시 출입 어려움",
+        "경찰은 수사전담팀을 구성"
+      ],
+      "speaker_note": "회사 브리핑과 당국 조사 착수 내용을 바탕으로 현재까지 파악된 원인 단서를 정리한다."
+    },
+    {
+      "layout": "takeaway",
+      "kicker": "Executive Takeaway",
+      "title": "반복 사고 이력까지 포함한 원인 규명이 핵심",
+      "bullets": [
+        "2018년 폭발 사고로 현장 2명 사망",
+        "당시 3명은 치료 중 사망",
+        "2019년 2월에도 근로자 3명 사망",
+        "작은 건물은 소방서 보고 의무 없음",
+        "점검·공정 위험 인식 재검토 필요"
+      ],
+      "speaker_note": "과거 두 차례 폭발 사고와 점검 사각지대 이슈를 함께 보며 재발 방지 관점의 결론을 제시한다."
+    }
+  ]
+}
