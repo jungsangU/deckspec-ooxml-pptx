@@ -11,6 +11,7 @@ deckspec-ooxml-pptx/
 ├── make_ppt.py
 ├── base_ooxml/
 ├── README.md
+├── 프롬프트.txt
 ├── requirements.txt
 └── test/
     ├── deckspec_template.json
@@ -183,25 +184,41 @@ qlmanage -t -s 1200 -o . output.pptx
 Use one of these values in `design.theme`.
 
 ```text
+auto
 policy_brief
 executive_summary
 data_report
 canva_modern_pitch
 canva_warm_editorial
 canva_fresh_startup
+crisis_brief
+tech_architecture
+strategy_board
+weather_risk
 ```
 
 The `canva_*` themes are not copied from Canva templates. They are Canva-like presentation style presets implemented with OOXML shapes, colors, and background motifs.
+
+`auto` lets the renderer choose a theme from deck content. For example, incident/safety text tends to select `crisis_brief`, weather-risk text tends to select `weather_risk`, AI/system architecture text tends to select `tech_architecture`, and CEO/board text tends to select `executive_summary`.
 
 ## Supported Slide Layouts
 
 Use one of these values in each slide's `layout`.
 
 ```text
+title_cover
 title_summary
 bullets
 metric_dashboard
 bar_comparison
+line_trend
+timeline
+process_flow
+comparison
+risk_matrix
+cause_effect
+architecture_map
+callout_focus
 takeaway
 ```
 
@@ -239,6 +256,112 @@ Used with `bar_comparison`.
 }
 ```
 
+### Line Chart
+
+Used with `line_trend`.
+
+```json
+{
+  "type": "line_chart",
+  "title": "사망자 수 기준 사고 이력",
+  "unit": "명",
+  "data": [
+    { "label": "2018", "value": 5 },
+    { "label": "2019", "value": 3 },
+    { "label": "2026", "value": 5 }
+  ],
+  "emphasis": "warning"
+}
+```
+
+### Timeline
+
+Used with `timeline`.
+
+```json
+{
+  "type": "timeline",
+  "events": [
+    { "time": "10:59", "label": "폭발 발생", "detail": "56동 세척 공실" },
+    { "time": "11:49", "label": "초진", "detail": "50분 만에 진압" }
+  ]
+}
+```
+
+### Process Flow
+
+Used with `process_flow`.
+
+```json
+{
+  "type": "process_flow",
+  "steps": [
+    { "label": "현장 통제", "detail": "붕괴 위험과 접근 제한" },
+    { "label": "원인 조사", "detail": "세척 공정 폭발 추정" }
+  ]
+}
+```
+
+### Risk Matrix
+
+Used with `risk_matrix`. `likelihood` and `impact` use `0` to `1`.
+
+```json
+{
+  "type": "risk_matrix",
+  "items": [
+    { "label": "세척공정", "likelihood": 0.82, "impact": 0.9, "emphasis": "warning" },
+    { "label": "점검사각", "likelihood": 0.68, "impact": 0.78, "emphasis": "accent" }
+  ]
+}
+```
+
+### Cause Effect
+
+Used with `cause_effect`.
+
+```json
+{
+  "type": "cause_effect",
+  "causes": ["화약 묻은 공구 세척", "작은 건물 점검 사각"],
+  "events": ["56동 세척 공실 폭발", "화재와 구조 지연"],
+  "effects": ["근로자 7명 사상", "공정 안전 재검토 필요"]
+}
+```
+
+### Architecture Map
+
+Used with `architecture_map`.
+
+```json
+{
+  "type": "architecture_map",
+  "nodes": [
+    { "id": "user", "label": "User" },
+    { "id": "harness", "label": "Harness", "emphasis": "primary" },
+    { "id": "model", "label": "Model" },
+    { "id": "tools", "label": "Tools" }
+  ],
+  "edges": [
+    { "from": "user", "to": "harness" },
+    { "from": "harness", "to": "model" },
+    { "from": "harness", "to": "tools" }
+  ]
+}
+```
+
+### Callout
+
+Used with `callout_focus`.
+
+```json
+{
+  "type": "callout",
+  "headline": "복구보다 중요한 것은 반복 패턴의 차단",
+  "body": "핵심 메시지를 한 문장 중심으로 크게 배치합니다."
+}
+```
+
 ## LLM Prompt For DeckSpec JSON
 
 다른 세션에서 LLM에게 DeckSpec JSON을 만들게 할 때는 아래 프롬프트를 사용하세요.
@@ -260,47 +383,78 @@ Rules:
 - Do not invent facts, sources, dates, numbers, company names, or claims.
 - Use concise Korean business presentation language.
 - Keep each bullet short enough for a slide.
-- Choose the most suitable design.theme from the allowed theme list.
+- Choose the most suitable design.theme from the allowed theme list. Use "auto" when the source text gives enough clues for content-aware theme selection.
 - Choose each slide.layout from the allowed layout list.
 - Use metric_card components for important headline numbers.
 - Use bar_chart components when comparing numeric values.
+- Use line_chart components for time-series or repeated incident history.
+- Use timeline components when exact event order matters.
+- Use process_flow components for operational steps.
+- Use risk_matrix components when likelihood and impact should be compared.
+- Use cause_effect components when causes, event, and effects should be separated.
+- Use architecture_map components for systems, agents, tools, model routing, or harness/A2A explanations.
+- Use callout components for a strong single-message slide.
 - Use bullets when the slide is mostly explanatory.
 - Use takeaway for the final executive conclusion.
 - If a layout requires components, include components.
 - If a slide has components, it may also include bullets for supporting context.
+- Keep slide titles under 34 Korean characters when possible.
+- Keep bullets short. The renderer will cap overflowing bullets, but the JSON should still be slide-friendly.
 
 Allowed design.theme values:
+- auto: content-aware theme selection by renderer
 - policy_brief: sober public-policy or research brief
 - executive_summary: CEO/board-level concise business summary
 - data_report: analytical report with numbers and comparisons
 - canva_modern_pitch: dark modern pitch deck style
 - canva_warm_editorial: warm editorial/report style
 - canva_fresh_startup: fresh startup/product style
+- crisis_brief: incident, safety, risk, accident, emergency, or audit brief
+- tech_architecture: AI, software architecture, harness, A2A, agent systems
+- strategy_board: strategy, roadmap, investment, transformation, board memo
+- weather_risk: typhoon, heavy rain, heat wave, forecast, weather warning brief
 
 Allowed slide.layout values:
+- title_cover
 - title_summary
 - bullets
 - metric_dashboard
 - bar_comparison
+- line_trend
+- timeline
+- process_flow
+- comparison
+- risk_matrix
+- cause_effect
+- architecture_map
+- callout_focus
 - takeaway
 
 Supported component types:
 - metric_card
 - bar_chart
+- line_chart
+- timeline
+- process_flow
+- comparison
+- risk_matrix
+- cause_effect
+- architecture_map
+- callout
 
 DeckSpec JSON schema:
 {
   "deck_title": "string",
   "subtitle": "string",
   "design": {
-    "theme": "policy_brief | executive_summary | data_report | canva_modern_pitch | canva_warm_editorial | canva_fresh_startup",
+    "theme": "auto | policy_brief | executive_summary | data_report | canva_modern_pitch | canva_warm_editorial | canva_fresh_startup | crisis_brief | tech_architecture | strategy_board | weather_risk",
     "tone": "string",
     "density": "low | medium | high",
     "visual_style": "string"
   },
   "slides": [
     {
-      "layout": "title_summary | bullets | metric_dashboard | bar_comparison | takeaway",
+      "layout": "title_cover | title_summary | bullets | metric_dashboard | bar_comparison | line_trend | timeline | process_flow | comparison | risk_matrix | cause_effect | architecture_map | callout_focus | takeaway",
       "kicker": "string",
       "title": "string",
       "bullets": ["string"],
@@ -321,6 +475,15 @@ DeckSpec JSON schema:
             { "label": "string", "value": 0 }
           ],
           "emphasis": "primary | accent | warning"
+        },
+        {
+          "type": "line_chart | timeline | process_flow | comparison | risk_matrix | cause_effect | architecture_map | callout",
+          "data": [],
+          "items": [],
+          "events": [],
+          "steps": [],
+          "nodes": [],
+          "edges": []
         }
       ],
       "speaker_note": "string"
@@ -329,10 +492,19 @@ DeckSpec JSON schema:
 }
 
 Layout guidance:
-- Use title_summary for the opening slide.
+- Put a title_cover slide as the first item in slides when the deck needs a cover.
+- Use title_summary for the first content slide after the cover.
 - Use metric_dashboard when the source has 2-3 important numbers.
 - Use bar_comparison when two or more numeric values should be compared.
-- Use bullets for concepts, causes, risks, or operating principles.
+- Use line_trend for time-series, repeated incidents, or year-by-year values.
+- Use timeline for chronological event handling.
+- Use process_flow for operational or investigation steps.
+- Use comparison for two-sided decisions, before/after, or immediate/structural split.
+- Use risk_matrix for likelihood-impact prioritization.
+- Use cause_effect for root-cause framing.
+- Use architecture_map for AI systems, harnesses, agents, tools, memory, or model routing.
+- Use callout_focus when a single conclusion should dominate the slide.
+- Use bullets for compact explanation when no visual pattern fits.
 - Use takeaway for the final conclusion.
 
 Source text:
@@ -363,6 +535,18 @@ canva_warm_editorial:
 
 canva_fresh_startup:
 제품 소개, 성장 전략, 젊고 밝은 스타트업 톤
+
+crisis_brief:
+사고, 안전, 인명 피해, 리스크, 감사, 수습, 조사 보고
+
+tech_architecture:
+AI 에이전트, 하네스, A2A, 모델 라우팅, 소프트웨어 구조
+
+strategy_board:
+전략, 로드맵, 투자, 전환 과제, 임원 의사결정
+
+weather_risk:
+태풍, 폭우, 폭염, 기상 특보, 지역별 날씨 위험 브리프
 ```
 
 ## Example LLM Output
