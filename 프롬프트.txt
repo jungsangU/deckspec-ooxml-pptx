@@ -40,6 +40,7 @@ Use this top-level structure:
   "subtitle": "string",
   "design": {
     "theme": "auto",
+    "template": "auto_random",
     "tone": "string",
     "density": "low | medium | high",
     "visual_style": "string"
@@ -51,6 +52,8 @@ Important:
 - "design.theme" may be "auto" or one of the explicit themes below.
 - Prefer "auto" when the source text has clear content clues.
 - Use an explicit theme when a strong style choice is obvious.
+- Use "design.template": "auto_random" unless the user requests a specific template.
+- Use "design.template": "none" only when the user wants no external PPTX style template.
 - Extra fields such as "visual_plan" are allowed for planning, but the renderer may ignore them.
 
 ============================================================
@@ -159,6 +162,14 @@ Examples:
 - policy_report
 - warm_editorial_report
 - risk_dashboard
+
+Choose "design.template":
+
+- auto_random: randomly select one PPTX style profile from templete/
+- none: do not use external PPTX style templates
+- exact template file name or stem: use that specific template profile
+
+Default to "auto_random" so the renderer can vary the visual template across runs.
 
 ============================================================
 5. Supported Slide Layouts

@@ -2,6 +2,7 @@ import argparse
 import html
 import json
 import os
+import random
 import re
 import sys
 import zipfile
@@ -10,10 +11,22 @@ from pathlib import Path
 
 DEFAULT_OUTPUT = "deck_from_deckspec_ooxml.pptx"
 BASE_OOXML_DIR = Path(__file__).with_name("base_ooxml")
+TEMPLATE_DIR = Path(__file__).with_name("templete")
 
 EMU_PER_INCH = 914400
 SLIDE_W = 12192000
 SLIDE_H = 6858000
+
+TEMPLATE_MOTIFS = [
+    ("data_blocks", "data_rows"),
+    ("editorial_frame", "editorial"),
+    ("diagonal_blocks", "outline"),
+    ("soft_circles", "cards"),
+    ("executive_frame", "numbered"),
+    ("weather_front", "weather"),
+    ("alert_band", "alert"),
+    ("blueprint", "outline"),
+]
 
 THEMES = {
     "policy_brief": {
@@ -254,6 +267,95 @@ def clamp_text(value, limit):
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def list_template_pptx():
+    if not TEMPLATE_DIR.exists():
+        return []
+    return sorted(path for path in TEMPLATE_DIR.glob("*.pptx") if not path.name.startswith("~$"))
+
+
+def color_distance_from_gray(color):
+    r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
+    return max(r, g, b) - min(r, g, b)
+
+
+def color_luminance(color):
+    r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def light_tint(color, factor=0.88):
+    r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
+    vals = [round(channel + (255 - channel) * factor) for channel in (r, g, b)]
+    return "".join(f"{value:02X}" for value in vals)
+
+
+def extract_template_colors(path):
+    colors = []
+    try:
+        with zipfile.ZipFile(path) as deck:
+            for name in deck.namelist():
+                if not name.endswith(".xml"):
+                    continue
+                if not (name.startswith("ppt/theme/") or name.startswith("ppt/slides/") or name.startswith("ppt/slideMasters/")):
+                    continue
+                xml = deck.read(name).decode("utf-8", errors="ignore")
+                colors.extend(re.findall(r'<a:srgbClr[^>]* val="([0-9A-Fa-f]{6})"', xml))
+    except zipfile.BadZipFile:
+        return []
+
+    ranked = []
+    counts = {}
+    for color in (c.upper() for c in colors):
+        counts[color] = counts.get(color, 0) + 1
+    for color, count in counts.items():
+        lum = color_luminance(color)
+        if color in {"000000", "FFFFFF"}:
+            continue
+        if not (28 <= lum <= 235):
+            continue
+        if color_distance_from_gray(color) < 24:
+            continue
+        ranked.append((count, color_distance_from_gray(color), color))
+    ranked.sort(reverse=True)
+    return [color for _, __, color in ranked[:5]]
+
+
+def template_profile_from_pptx(path, index):
+    colors = extract_template_colors(path)
+    primary = colors[0] if colors else "2563EB"
+    accent = colors[1] if len(colors) > 1 else "0F766E"
+    warning = colors[2] if len(colors) > 2 else "EA580C"
+    motif, bullet_style = TEMPLATE_MOTIFS[index % len(TEMPLATE_MOTIFS)]
+    return {
+        "name": path.stem,
+        "path": str(path),
+        "primary": primary,
+        "accent": accent,
+        "warning": warning,
+        "surface_alt": light_tint(primary, 0.86),
+        "line": light_tint(primary, 0.72),
+        "motif": motif,
+        "bullet_style": bullet_style,
+    }
+
+
+def select_template_profile(deckspec):
+    templates = list_template_pptx()
+    if not templates:
+        return None
+    design = deckspec.get("design", {}) if isinstance(deckspec, dict) else {}
+    request = safe_text(design.get("template", "auto_random")).strip()
+    if request in {"", "none", "off", "false"}:
+        return None
+    if request in {"auto", "auto_random", "random"}:
+        path = random.choice(templates)
+        return template_profile_from_pptx(path, templates.index(path))
+    for index, path in enumerate(templates):
+        if request == path.name or request == path.stem:
+            return template_profile_from_pptx(path, index)
+    return None
+
+
 def deck_text(deckspec):
     parts = [
         safe_text(deckspec.get("deck_title", "")),
@@ -301,7 +403,13 @@ def theme_for(deckspec):
         theme_name = "weather_risk"
     if theme_name in ("auto", "content_aware", "content-aware", ""):
         theme_name = infer_theme_name(deckspec)
-    return THEMES.get(theme_name, THEMES["policy_brief"])
+    theme = dict(THEMES.get(theme_name, THEMES["policy_brief"]))
+    profile = select_template_profile(deckspec)
+    if profile:
+        theme.update({k: v for k, v in profile.items() if k not in {"path"}})
+        design["selected_template"] = profile["name"]
+        deckspec["design"] = design
+    return theme
 
 
 def theme_color(theme, key):
@@ -1552,6 +1660,9 @@ def main():
 
     print(f"Created {output_path}")
     print(f"Slides: {len(deckspec['slides'])}")
+    selected_template = deckspec.get("design", {}).get("selected_template")
+    if selected_template:
+        print(f"Template: {selected_template}")
     if args.dump_ooxml:
         print(f"OOXML dumped to {os.path.abspath(args.dump_ooxml)}")
 
