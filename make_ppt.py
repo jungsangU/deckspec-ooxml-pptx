@@ -236,6 +236,17 @@ def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, r
         if radius
         else '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
     )
+    if not paragraphs:
+        return f"""
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm>
+          {geom}
+          {fill_xml}
+          {line_xml}
+        </p:spPr>
+      </p:sp>"""
     return f"""
       <p:sp>
         <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
