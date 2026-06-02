@@ -16,6 +16,33 @@ TEMPLATE_PROFILES_PATH = Path(__file__).with_name("template_profiles.json")
 EMU_PER_INCH = 914400
 SLIDE_W = 12192000
 SLIDE_H = 6858000
+MIN_READABLE_FONT = 950
+TYPEFACE_LATIN = "Pretendard"
+TYPEFACE_EAST_ASIAN = "Pretendard"
+TYPEFACE_COMPLEX = "Pretendard"
+
+FONT = {
+    "micro": 950,
+    "caption": 1050,
+    "label": 1200,
+    "body_small": 1300,
+    "body": 1450,
+    "body_large": 1650,
+    "section": 1900,
+    "display": 2800,
+    "hero": 3400,
+}
+
+CONTENT = {
+    "left": 0.85,
+    "top": 1.9,
+    "right": 12.45,
+    "bottom": 6.15,
+    "width": 11.6,
+    "gap": 0.28,
+    "row_h": 0.76,
+    "row_step": 0.94,
+}
 
 THEMES = {
     "policy_brief": {
@@ -330,7 +357,21 @@ def theme_for(deckspec):
     theme = dict(THEMES.get(theme_name, THEMES["policy_brief"]))
     profile = select_template_profile(deckspec)
     if profile:
-        style_keys = {"primary", "accent", "warning", "surface_alt", "line", "motif", "bullet_style", "layout_variants"}
+        style_keys = {
+            "primary",
+            "accent",
+            "warning",
+            "surface_alt",
+            "line",
+            "motif",
+            "bullet_style",
+            "layout_variants",
+            "template_style",
+            "frame_color",
+            "dot_color",
+            "title_fill",
+            "progress_fill",
+        }
         theme.update({k: v for k, v in profile.items() if k in style_keys})
         design["selected_template"] = profile["name"]
         deckspec["design"] = design
@@ -341,11 +382,106 @@ def theme_color(theme, key):
     return theme.get(key, theme["primary"])
 
 
-def layout_variant(theme, layout, default="default"):
+def candidate_variants(entry, default):
+    if isinstance(entry, str):
+        return entry, [entry], {}
+    if isinstance(entry, list):
+        candidates = [safe_text(v) for v in entry if safe_text(v)]
+        return candidates[0] if candidates else default, candidates or [default], {}
+    if isinstance(entry, dict):
+        candidates = [safe_text(v) for v in entry.get("candidates", []) if safe_text(v)]
+        default_variant = safe_text(entry.get("default", candidates[0] if candidates else default))
+        if default_variant and default_variant not in candidates:
+            candidates.insert(0, default_variant)
+        return default_variant or default, candidates or [default], entry.get("rules", {})
+    return default, [default], {}
+
+
+def slide_variant_hint(slide, candidates):
+    requested = safe_text(slide.get("variant") or slide.get("preferred_variant"))
+    if requested and requested not in {"auto", "content_aware", "content-aware"}:
+        return requested if requested in candidates else None
+    return None
+
+
+def content_variant_scores(layout, slide, candidates, rules):
+    scores = {candidate: 0 for candidate in candidates}
+    bullets = slide.get("bullets", [])
+    components = slide.get("components", [])
+    if layout == "metric_dashboard":
+        metric_count = len([c for c in components if c.get("type") == "metric_card"])
+        if metric_count >= 3:
+            for candidate in ["radial_bubbles", "donut_metrics", "staggered_cards"]:
+                scores[candidate] = scores.get(candidate, 0) + 4
+        if metric_count <= 2:
+            for candidate in ["scoreboard", "alert_cards", "strip_cards"]:
+                scores[candidate] = scores.get(candidate, 0) + 3
+        if len(bullets) >= 3:
+            for candidate in ["vertical_stack", "compact_table"]:
+                scores[candidate] = scores.get(candidate, 0) + 2
+    elif layout == "bar_comparison":
+        chart = next((c for c in components if c.get("type") == "bar_chart"), {})
+        data_len = len(chart.get("data", []))
+        if data_len <= 3:
+            for candidate in ["progress_rows", "blue_progress_rows", "lollipop"]:
+                scores[candidate] = scores.get(candidate, 0) + 4
+        if data_len >= 4:
+            for candidate in ["horizontal_bars", "vertical_columns", "split_panel"]:
+                scores[candidate] = scores.get(candidate, 0) + 3
+    elif layout == "title_cover":
+        title_len = len(safe_text(slide.get("title", "")))
+        if title_len > 28:
+            for candidate in ["left_panel", "diagonal_hero", "executive_memo"]:
+                scores[candidate] = scores.get(candidate, 0) + 2
+        else:
+            for candidate in ["blue_ribbon_title", "center_capsule_title", "centered_badge"]:
+                scores[candidate] = scores.get(candidate, 0) + 2
+    elif layout == "takeaway":
+        if len(bullets) >= 3:
+            for candidate in ["ribbon_summary", "decision_memo", "summary_panel"]:
+                scores[candidate] = scores.get(candidate, 0) + 3
+        else:
+            for candidate in ["quote_band", "forecast_brief", "full_bleed_callout"]:
+                scores[candidate] = scores.get(candidate, 0) + 2
+
+    for rule_key, variant in rules.items():
+        variant = safe_text(variant)
+        if not variant:
+            continue
+        if rule_key == "many_metrics" and len([c for c in components if c.get("type") == "metric_card"]) >= 3:
+            scores[variant] = scores.get(variant, 0) + 6
+        if rule_key == "few_big_numbers" and len([c for c in components if c.get("type") == "metric_card"]) <= 2:
+            scores[variant] = scores.get(variant, 0) + 6
+        if rule_key == "many_bars":
+            chart = next((c for c in components if c.get("type") == "bar_chart"), {})
+            if len(chart.get("data", [])) >= 4:
+                scores[variant] = scores.get(variant, 0) + 6
+    return scores
+
+
+def layout_variant(theme, layout, default="default", slide=None):
     variants = theme.get("layout_variants", {})
-    if isinstance(variants, dict):
-        return variants.get(layout, default)
-    return default
+    entry = variants.get(layout, default) if isinstance(variants, dict) else default
+    default_variant, candidates, rules = candidate_variants(entry, default)
+    slide = slide or {}
+    hinted = slide_variant_hint(slide, candidates)
+    if hinted:
+        return hinted
+    usage = theme.setdefault("_variant_usage", {})
+    scores = content_variant_scores(layout, slide, candidates, rules)
+    ranked = sorted(
+        candidates,
+        key=lambda candidate: (
+            -(scores.get(candidate, 0) - usage.get((layout, candidate), 0) * 4),
+            usage.get((layout, candidate), 0),
+            0 if candidate == default_variant else 1,
+            candidates.index(candidate),
+        ),
+    )
+    selected = ranked[0] if ranked else default_variant
+    usage[(layout, selected)] = usage.get((layout, selected), 0) + 1
+    slide["_selected_variant"] = selected
+    return selected
 
 
 def srgb_fill_xml(color, alpha=None):
@@ -354,15 +490,18 @@ def srgb_fill_xml(color, alpha=None):
     return f'<a:solidFill><a:srgbClr val="{color}"><a:alpha val="{alpha}"/></a:srgbClr></a:solidFill>'
 
 
-def paragraph_xml(text, size=2200, color="374151", bold=False):
+def paragraph_xml(text, size=2200, color="374151", bold=False, align=None):
+    size = max(int(size), MIN_READABLE_FONT)
     bold_attr = ' b="1"' if bold else ""
+    align_map = {"center": "ctr", "ctr": "ctr", "right": "r", "r": "r"}
+    align_attr = f' algn="{align_map.get(align, align)}"' if align else ""
     return (
         "<a:p>"
-        '<a:pPr marL="0" indent="0"><a:buNone/></a:pPr>'
+        f'<a:pPr marL="0" indent="0"{align_attr}><a:buNone/></a:pPr>'
         "<a:r>"
         f'<a:rPr lang="ko-KR" sz="{size}"{bold_attr}>'
         f'<a:solidFill><a:srgbClr val="{color}"/></a:solidFill>'
-        '<a:latin typeface="Aptos"/><a:ea typeface="Malgun Gothic"/><a:cs typeface="Aptos"/>'
+        f'<a:latin typeface="{TYPEFACE_LATIN}"/><a:ea typeface="{TYPEFACE_EAST_ASIAN}"/><a:cs typeface="{TYPEFACE_COMPLEX}"/>'
         "</a:rPr>"
         f"<a:t>{xml_escape(text)}</a:t>"
         "</a:r>"
@@ -371,7 +510,7 @@ def paragraph_xml(text, size=2200, color="374151", bold=False):
     )
 
 
-def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, radius=False):
+def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, radius=False, anchor="t", margin_x=91440, margin_y=45720):
     fill_xml = '<a:noFill/>' if fill is None else srgb_fill_xml(fill)
     line_xml = "<a:ln><a:noFill/></a:ln>" if line is None else f'<a:ln w="12700"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>'
     geom = (
@@ -400,7 +539,7 @@ def text_box_xml(shape_id, name, x, y, w, h, paragraphs, fill=None, line=None, r
           {line_xml}
         </p:spPr>
         <p:txBody>
-          <a:bodyPr wrap="square" lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/>
+          <a:bodyPr wrap="square" lIns="{margin_x}" tIns="{margin_y}" rIns="{margin_x}" bIns="{margin_y}" anchor="{anchor}"/>
           <a:lstStyle/>
           {''.join(paragraphs)}
         </p:txBody>
@@ -417,6 +556,41 @@ def shape_xml(shape_id, name, x, y, w, h, fill, line=None, shape="rect"):
           <a:prstGeom prst="{shape}"><a:avLst/></a:prstGeom>
           {srgb_fill_xml(fill)}
           {line_xml}
+        </p:spPr>
+      </p:sp>"""
+
+
+def outlined_shape_xml(shape_id, name, x, y, w, h, line, width=25400, shape="roundRect", fill=None):
+    fill_xml = "<a:noFill/>" if fill is None else srgb_fill_xml(fill)
+    geom = (
+        '<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 6000"/></a:avLst></a:prstGeom>'
+        if shape == "roundRect"
+        else f'<a:prstGeom prst="{shape}"><a:avLst/></a:prstGeom>'
+    )
+    return f"""
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm>
+          {geom}
+          {fill_xml}
+          <a:ln w="{width}"><a:solidFill><a:srgbClr val="{line}"/></a:solidFill></a:ln>
+        </p:spPr>
+      </p:sp>"""
+
+
+def pattern_shape_xml(shape_id, name, x, y, w, h, bg, fg, pattern="pct5", shape="rect"):
+    return f"""
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="{shape_id}" name="{xml_escape(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm>
+          <a:prstGeom prst="{shape}"><a:avLst/></a:prstGeom>
+          <a:pattFill prst="{pattern}">
+            <a:fgClr><a:srgbClr val="{fg}"/></a:fgClr>
+            <a:bgClr><a:srgbClr val="{bg}"/></a:bgClr>
+          </a:pattFill>
+          <a:ln><a:noFill/></a:ln>
         </p:spPr>
       </p:sp>"""
 
@@ -474,6 +648,27 @@ def as_number(value, default=0):
 
 
 def add_background_motif(shapes, theme, shape_id):
+    if theme.get("template_style") == "blue_ribbon_business":
+        navy = theme.get("frame_color", theme["accent"])
+        shapes.append(translucent_shape_xml(shape_id, "Blue Ribbon Top Slab", emu(9.35), emu(0.22), emu(3.2), emu(0.82), navy, 17000, "roundRect"))
+        shape_id += 1
+        shapes.append(translucent_shape_xml(shape_id, "Blue Accent Tab", emu(10.35), emu(1.02), emu(1.35), emu(0.34), theme["primary"], 19000, "roundRect"))
+        shape_id += 1
+        shapes.append(translucent_shape_xml(shape_id, "Blue Bottom Wash", emu(0), emu(6.75), SLIDE_W, emu(0.28), theme["surface_alt"], 35000))
+        shape_id += 1
+        shapes.append(outlined_shape_xml(shape_id, "Blue Ghost Circle", emu(0.55), emu(5.55), emu(1.2), emu(1.2), theme["line"], 9525, "ellipse"))
+        shape_id += 1
+        return shape_id
+
+    if theme.get("template_style") == "mint_dotted_business":
+        shapes.append(pattern_shape_xml(shape_id, "Mint Dot Background", emu(0.38), emu(0.25), emu(12.58), emu(6.62), theme["accent"], theme.get("dot_color", "FFFFFF"), "pct10", "roundRect"))
+        shape_id += 1
+        shapes.append(outlined_shape_xml(shape_id, "Coral Outer Frame", emu(0.36), emu(0.24), emu(12.62), emu(6.64), theme.get("frame_color", "F27C70"), 57150, "roundRect"))
+        shape_id += 1
+        shapes.append(outlined_shape_xml(shape_id, "Dotted Inner Frame", emu(0.52), emu(0.42), emu(12.28), emu(6.28), "FFFFFF", 6350, "roundRect"))
+        shape_id += 1
+        return shape_id
+
     motif = theme.get("motif", "top_band")
     if motif == "side_panel":
         shapes.append(translucent_shape_xml(shape_id, "Side Panel", emu(0), emu(0), emu(1.15), SLIDE_H, theme["primary"], 17000))
@@ -552,6 +747,44 @@ def add_background_motif(shapes, theme, shape_id):
 
 
 def add_header(shapes, slide, theme, shape_id):
+    if theme.get("template_style") == "blue_ribbon_business":
+        navy = theme.get("frame_color", theme["accent"])
+        shapes.append(shape_xml(shape_id, "Header Navy Ribbon", emu(0.62), emu(0.37), emu(11.75), emu(0.5), navy, navy, "roundRect"))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Header Blue Badge", emu(0.45), emu(0.35), emu(0.72), emu(0.55), theme["primary"], theme["primary"], "roundRect"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Header Number", emu(0.58), emu(0.46), emu(0.42), emu(0.25), [paragraph_xml("1", FONT["micro"], "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Title", emu(1.28), emu(0.43), emu(10.75), emu(0.32), [paragraph_xml(clamp_text(slide.get("title", "PPT PRESENTATION"), 42), FONT["body"], "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        shapes.append(line_segment_xml(shape_id, "Header Blue Rule", emu(0.68), emu(1.08), emu(12.1), emu(1.08), theme["primary"], 12700))
+        return shape_id + 1
+
+    if theme.get("template_style") == "mint_dotted_business":
+        shapes.append(outlined_shape_xml(shape_id, "Header Number Badge", emu(0.55), emu(0.42), emu(0.64), emu(0.36), theme["primary"], 12700, "roundRect", theme.get("title_fill", "FFFFFF")))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Header Number", emu(0.68), emu(0.46), emu(0.26), emu(0.22), [paragraph_xml("1", FONT["micro"], theme["primary"], True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        shapes.append(outlined_shape_xml(shape_id, "Header Capsule", emu(1.08), emu(0.42), emu(11.15), emu(0.36), theme["primary"], 12700, "roundRect", theme.get("title_fill", "FFFFFF")))
+        shape_id += 1
+        shapes.append(line_segment_xml(shape_id, "Header Dotted Rule", emu(1.28), emu(0.74), emu(11.95), emu(0.74), theme["primary"], 6350, "dash"))
+        shape_id += 1
+        shapes.append(
+            text_box_xml(
+                shape_id,
+                "Title",
+                emu(1.32),
+                emu(0.42),
+                emu(10.5),
+                emu(0.34),
+                [paragraph_xml(clamp_text(slide.get("title", "PPT PRESENTATION"), 44), FONT["body"], theme["primary"], True, "center")],
+                anchor="ctr",
+                margin_x=0,
+                margin_y=0,
+            )
+        )
+        return shape_id + 1
+
     shapes.append(
         text_box_xml(
             shape_id,
@@ -560,7 +793,7 @@ def add_header(shapes, slide, theme, shape_id):
             emu(0.34),
             emu(5.6),
             emu(0.35),
-            [paragraph_xml(clamp_text(slide.get("kicker", ""), 64), 1100, theme["primary"], True)],
+            [paragraph_xml(clamp_text(slide.get("kicker", ""), 64), FONT["label"], theme["primary"], True)],
         )
     )
     shape_id += 1
@@ -572,7 +805,7 @@ def add_header(shapes, slide, theme, shape_id):
             emu(0.72),
             emu(11.85),
             emu(0.72),
-            [paragraph_xml(clamp_text(slide.get("title", "Untitled"), 56), 3000, theme["text"], True)],
+            [paragraph_xml(clamp_text(slide.get("title", "Untitled"), 56), FONT["display"], theme["text"], True)],
         )
     )
     shape_id += 1
@@ -717,7 +950,71 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
     if not cards:
         return render_bullets(shapes, slide, theme, shape_id)
 
-    variant = layout_variant(theme, "metric_dashboard", "strip_cards")
+    treatment = slide.get("visual_treatment", "standard")
+    if treatment == "hero_metric_strip" and len(cards) >= 3:
+        main = cards[0]
+        accent = theme_color(theme, main.get("emphasis", "primary"))
+        shapes.append(text_box_xml(shape_id, "Metric Story Hero", emu(0.85), emu(1.92), emu(4.45), emu(3.18), [], fill=theme["surface_alt"], line=accent, radius=True))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Metric Story Accent", emu(0.85), emu(1.92), emu(0.16), emu(3.18), accent, accent))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Metric Story Label", emu(1.22), emu(2.22), emu(3.7), emu(0.38), [paragraph_xml(clamp_text(main.get("label", ""), 26), FONT["label"], theme["muted"], True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Metric Story Value", emu(1.18), emu(2.72), emu(3.9), emu(0.86), [paragraph_xml(clamp_text(main.get("value", ""), 18), 3800, accent, True)]))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Metric Story Context", emu(1.22), emu(3.82), emu(3.75), emu(0.7), [paragraph_xml(clamp_text(main.get("delta", ""), 34), FONT["body"], theme["text"], True), paragraph_xml(clamp_text(main.get("context", ""), 48), FONT["caption"], theme["muted"])]))
+        shape_id += 1
+        y = 2.05
+        for card in cards[1:]:
+            accent = theme_color(theme, card.get("emphasis", "accent"))
+            shapes.append(text_box_xml(shape_id, "Metric Story Secondary", emu(5.75), emu(y), emu(5.85), emu(0.98), [], fill=theme["surface"], line=theme["line"], radius=True))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Metric Story Dot", emu(6.05), emu(y + 0.34), emu(0.18), emu(0.18), accent, accent, "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Metric Story Secondary Text", emu(6.48), emu(y + 0.16), emu(4.75), emu(0.48), [paragraph_xml(f"{clamp_text(card.get('label', ''), 18)}  {clamp_text(card.get('value', ''), 14)}", FONT["section"], accent, True), paragraph_xml(clamp_text(card.get("context", ""), 46), FONT["caption"], theme["muted"])]))
+            shape_id += 1
+            y += 1.22
+        return render_bullets(shapes, slide, theme, shape_id, start_y=5.35, max_items=1, box_h=0.48, step=0.56, font_size=1200, text_limit=62)
+
+    variant = layout_variant(theme, "metric_dashboard", "strip_cards", slide)
+    if variant == "radial_bubbles":
+        navy = theme.get("frame_color", theme["accent"])
+        center_y = 3.02
+        x_positions = [2.0, 5.48, 8.96]
+        for idx, card in enumerate(cards):
+            accent = theme_color(theme, card.get("emphasis", "primary"))
+            x = x_positions[idx]
+            shapes.append(shape_xml(shape_id, "Radial Bubble Outer", emu(x), emu(center_y - 0.92), emu(1.85), emu(1.85), theme["surface_alt"], theme["line"], "ellipse"))
+            shape_id += 1
+            shapes.append(outlined_shape_xml(shape_id, "Radial Bubble Arc", emu(x + 0.08), emu(center_y - 0.84), emu(1.69), emu(1.69), accent, 28575, "arc"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Radial Bubble Dot", emu(x + 1.34), emu(center_y - 0.68), emu(0.28), emu(0.28), theme["warning"], "FFFFFF", "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Radial Value", emu(x + 0.24), emu(center_y - 0.2), emu(1.38), emu(0.38), [paragraph_xml(clamp_text(card.get("value", ""), 10), FONT["body_large"], navy, True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Radial Label", emu(x - 0.38), emu(center_y + 1.08), emu(2.62), emu(0.36), [paragraph_xml(clamp_text(card.get("label", ""), 22), FONT["label"], theme["text"], True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Radial Context", emu(x - 0.62), emu(center_y + 1.48), emu(3.1), emu(0.46), [paragraph_xml(clamp_text(card.get("delta") or card.get("context", ""), 42), FONT["micro"], theme["muted"], False, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+        return shape_id
+
+    if variant == "donut_metrics":
+        x_positions = [1.55, 5.05, 8.55]
+        for idx, card in enumerate(cards):
+            accent = theme_color(theme, card.get("emphasis", "primary"))
+            x = x_positions[idx]
+            shapes.append(shape_xml(shape_id, "Donut Track", emu(x), emu(2.1), emu(1.75), emu(1.75), "FFFFFF", theme["primary"], "donut"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Donut Accent", emu(x + 1.08), emu(1.9), emu(0.52), emu(0.26), theme.get("progress_fill", theme["warning"]), theme["primary"], "parallelogram"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Donut Value", emu(x + 0.32), emu(2.68), emu(1.12), emu(0.42), [paragraph_xml(clamp_text(card.get("value", ""), 8), FONT["body_large"], theme["text"], True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Donut Label", emu(x - 0.25), emu(4.22), emu(2.35), emu(0.36), [paragraph_xml(clamp_text(card.get("label", ""), 22), FONT["label"], theme["text"], True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Donut Context", emu(x - 0.38), emu(4.6), emu(2.6), emu(0.46), [paragraph_xml(clamp_text(card.get("delta") or card.get("context", ""), 42), FONT["micro"], theme["muted"], False, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+        return shape_id
+
     if variant in {"scoreboard", "alert_cards"}:
         main = cards[0]
         accent = theme_color(theme, main.get("emphasis", "primary"))
@@ -725,11 +1022,11 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
         shape_id += 1
         shapes.append(shape_xml(shape_id, "Hero Metric Stripe", emu(0.85), emu(1.95), emu(5.35), emu(0.16), accent, accent))
         shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Hero Metric Label", emu(1.2), emu(2.2), emu(4.6), emu(0.32), [paragraph_xml(clamp_text(main.get("label", ""), 28), 1100, theme["muted"], True)]))
+        shapes.append(text_box_xml(shape_id, "Hero Metric Label", emu(1.2), emu(2.2), emu(4.6), emu(0.34), [paragraph_xml(clamp_text(main.get("label", ""), 28), FONT["label"], theme["muted"], True)]))
         shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Hero Metric Value", emu(1.2), emu(2.58), emu(4.7), emu(0.8), [paragraph_xml(clamp_text(main.get("value", ""), 22), 3300, accent, True)]))
+        shapes.append(text_box_xml(shape_id, "Hero Metric Value", emu(1.2), emu(2.58), emu(4.7), emu(0.8), [paragraph_xml(clamp_text(main.get("value", ""), 22), FONT["hero"], accent, True)]))
         shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Hero Metric Context", emu(1.2), emu(3.48), emu(4.6), emu(0.48), [paragraph_xml(clamp_text(main.get("delta", ""), 34), 1500, theme["text"], True), paragraph_xml(clamp_text(main.get("context", ""), 42), 950, theme["muted"])]))
+        shapes.append(text_box_xml(shape_id, "Hero Metric Context", emu(1.2), emu(3.48), emu(4.6), emu(0.52), [paragraph_xml(clamp_text(main.get("delta", ""), 34), FONT["body"], theme["text"], True), paragraph_xml(clamp_text(main.get("context", ""), 42), FONT["micro"], theme["muted"])]))
         shape_id += 1
         y = 1.95
         for card in cards[1:]:
@@ -738,7 +1035,7 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
             shape_id += 1
             shapes.append(shape_xml(shape_id, "Side Metric Dot", emu(6.82), emu(y + 0.28), emu(0.18), emu(0.18), accent, accent, "ellipse"))
             shape_id += 1
-            shapes.append(text_box_xml(shape_id, "Side Metric Text", emu(7.12), emu(y + 0.14), emu(4.8), emu(0.72), [paragraph_xml(clamp_text(card.get("label", ""), 26), 1000, theme["muted"], True), paragraph_xml(clamp_text(card.get("value", ""), 24), 1900, accent, True)]))
+            shapes.append(text_box_xml(shape_id, "Side Metric Text", emu(7.12), emu(y + 0.14), emu(4.8), emu(0.72), [paragraph_xml(clamp_text(card.get("label", ""), 26), FONT["caption"], theme["muted"], True), paragraph_xml(clamp_text(card.get("value", ""), 24), FONT["section"], accent, True)]))
             shape_id += 1
             y += 1.28
         return render_bullets(shapes, slide, theme, shape_id, start_y=4.85, max_items=1, font_size=1350, text_limit=70)
@@ -751,11 +1048,11 @@ def render_metric_dashboard(shapes, slide, theme, shape_id):
             shape_id += 1
             shapes.append(shape_xml(shape_id, "Metric Row Accent", emu(0.95), emu(y), emu(0.1), emu(0.82), accent, accent))
             shape_id += 1
-            shapes.append(text_box_xml(shape_id, "Metric Row Label", emu(1.25), emu(y + 0.17), emu(3.2), emu(0.36), [paragraph_xml(clamp_text(card.get("label", ""), 28), 1250, theme["text"], True)]))
+            shapes.append(text_box_xml(shape_id, "Metric Row Label", emu(1.25), emu(y + 0.16), emu(3.2), emu(0.38), [paragraph_xml(clamp_text(card.get("label", ""), 28), FONT["body_small"], theme["text"], True)]))
             shape_id += 1
-            shapes.append(text_box_xml(shape_id, "Metric Row Value", emu(4.65), emu(y + 0.08), emu(3.0), emu(0.42), [paragraph_xml(clamp_text(card.get("value", ""), 24), 1850, accent, True)]))
+            shapes.append(text_box_xml(shape_id, "Metric Row Value", emu(4.65), emu(y + 0.08), emu(3.0), emu(0.44), [paragraph_xml(clamp_text(card.get("value", ""), 24), FONT["section"], accent, True)]))
             shape_id += 1
-            shapes.append(text_box_xml(shape_id, "Metric Row Context", emu(7.65), emu(y + 0.16), emu(4.0), emu(0.38), [paragraph_xml(clamp_text(card.get("delta") or card.get("context", ""), 46), 1100, theme["muted"])]))
+            shapes.append(text_box_xml(shape_id, "Metric Row Context", emu(7.65), emu(y + 0.16), emu(4.0), emu(0.38), [paragraph_xml(clamp_text(card.get("delta") or card.get("context", ""), 46), FONT["caption"], theme["muted"])]))
             shape_id += 1
             y += 0.98
         return render_bullets(shapes, slide, theme, shape_id, start_y=5.05, max_items=1, font_size=1300, text_limit=70)
@@ -842,7 +1139,8 @@ def render_bar_comparison(shapes, slide, theme, shape_id):
     data = chart.get("data", [])[:5]
     values = [float(item.get("value", 0)) for item in data if isinstance(item.get("value", 0), (int, float))]
     max_value = max(values) if values else 1
-    variant = layout_variant(theme, "bar_comparison", "horizontal_bars")
+    treatment = slide.get("visual_treatment", "standard")
+    variant = layout_variant(theme, "bar_comparison", "horizontal_bars", slide)
 
     shapes.append(
         text_box_xml(
@@ -856,6 +1154,89 @@ def render_bar_comparison(shapes, slide, theme, shape_id):
         )
     )
     shape_id += 1
+
+    if treatment == "ranked_bars" and data:
+        sorted_data = sorted(data, key=lambda item: as_number(item.get("value", 0)), reverse=True)
+        accent = theme_color(theme, chart.get("emphasis", "primary"))
+        unit = safe_text(chart.get("unit", ""))
+        y = 2.34
+        bar_x, bar_max_w = 3.05, 6.9
+        for idx, item in enumerate(sorted_data[:5]):
+            value = as_number(item.get("value", 0))
+            bar_w = max(0.16, bar_max_w * value / max_value)
+            fill = accent if idx == 0 else (theme["accent"] if idx == 1 else theme["primary"])
+            alpha_fill = theme["surface_alt"] if idx == 0 else theme["surface"]
+            shapes.append(text_box_xml(shape_id, "Rank Row Background", emu(0.9), emu(y - 0.05), emu(11.35), emu(0.5), [], fill=alpha_fill, line=theme["line"], radius=True))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Rank Number", emu(1.08), emu(y + 0.05), emu(0.42), emu(0.24), [paragraph_xml(str(idx + 1), FONT["micro"], fill, True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Rank Label", emu(1.62), emu(y), emu(1.65), emu(0.32), [paragraph_xml(clamp_text(item.get("label", ""), 16), FONT["body_small"], theme["text"], True)]))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Rank Bar Track", emu(bar_x), emu(y + 0.07), emu(bar_max_w), emu(0.24), "E5E7EB", None, "roundRect"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Rank Bar Value", emu(bar_x), emu(y + 0.07), emu(bar_w), emu(0.24), fill, fill, "roundRect"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Rank Value", emu(bar_x + bar_max_w + 0.22), emu(y), emu(1.05), emu(0.32), [paragraph_xml(f"{value:g}{unit}", FONT["body_small"], fill, True)]))
+            shape_id += 1
+            y += 0.66
+        top = sorted_data[0]
+        shapes.append(text_box_xml(shape_id, "Rank Insight", emu(8.45), emu(5.42), emu(3.45), emu(0.52), [paragraph_xml(f"최대 항목: {clamp_text(top.get('label', ''), 16)}", FONT["label"], accent, True), paragraph_xml(f"{as_number(top.get('value', 0)):g}{unit}", FONT["section"], theme["text"], True)], fill=theme["surface"], line=accent, radius=True))
+        return shape_id + 1
+
+    if variant == "blue_progress_rows":
+        y = 2.1
+        navy = theme.get("frame_color", theme["accent"])
+        accent = theme_color(theme, chart.get("emphasis", "primary"))
+        for idx, item in enumerate(data[:3]):
+            label = clamp_text(item.get("label", ""), 22)
+            value = float(item.get("value", 0))
+            pct = int(round((value / max_value) * 100)) if max_value else 0
+            shapes.append(shape_xml(shape_id, "Blue Row Badge", emu(1.05), emu(y - 0.04), emu(0.78), emu(0.78), theme["surface_alt"], theme["primary"], "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Blue Row Number", emu(1.22), emu(y + 0.17), emu(0.44), emu(0.24), [paragraph_xml(str(idx + 1), FONT["micro"], navy, True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Blue Row Bar", emu(2.42), emu(y + 0.13), emu(3.75), emu(0.34), [], fill="FFFFFF", line=theme["line"], radius=True))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Blue Row Fill", emu(2.48), emu(y + 0.2), emu(max(0.18, 3.38 * value / max_value)), emu(0.2), theme.get("progress_fill", theme["surface_alt"]), None, "roundRect"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Blue Row Percent", emu(4.78), emu(y + 0.12), emu(0.82), emu(0.26), [paragraph_xml(f"{pct}%", FONT["micro"], navy, True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(line_segment_xml(shape_id, "Blue Row Connector", emu(6.28), emu(y + 0.31), emu(7.02), emu(y + 0.31), navy, 6350, "dash"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Blue Content Dot", emu(7.18), emu(y + 0.22), emu(0.18), emu(0.18), theme["warning"], theme["warning"], "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Blue Row Label", emu(7.55), emu(y), emu(3.95), emu(0.32), [paragraph_xml("CONTENTS A", FONT["micro"], theme["text"], True)]))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Blue Row Detail", emu(7.55), emu(y + 0.34), emu(4.25), emu(0.36), [paragraph_xml(label, FONT["micro"], theme["muted"])]))
+            shape_id += 1
+            y += 1.12
+        return shape_id
+
+    if variant == "progress_rows":
+        y = 2.0
+        accent = theme_color(theme, chart.get("emphasis", "primary"))
+        for idx, item in enumerate(data[:3]):
+            label = clamp_text(item.get("label", ""), 18)
+            value = float(item.get("value", 0))
+            pct = int(round((value / max_value) * 100)) if max_value else 0
+            shapes.append(outlined_shape_xml(shape_id, "Icon Circle", emu(1.25), emu(y + 0.05), emu(0.56), emu(0.56), theme["primary"], 12700, "ellipse", theme["surface_alt"]))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Icon Glyph", emu(1.39), emu(y + 0.18), emu(0.25), emu(0.2), [paragraph_xml(str(idx + 1), FONT["micro"], theme["primary"], True)]))
+            shape_id += 1
+            shapes.append(outlined_shape_xml(shape_id, "Progress Capsule", emu(3.0), emu(y + 0.17), emu(3.35), emu(0.28), theme["primary"], 9525, "roundRect", "FFFFFF"))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Progress Fill", emu(3.02), emu(y + 0.19), emu(max(0.18, 3.08 * value / max_value)), emu(0.18), theme.get("progress_fill", "F6E87A"), None, "roundRect"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Progress Value", emu(4.72), emu(y + 0.14), emu(0.78), emu(0.26), [paragraph_xml(f"{pct}%", FONT["micro"], theme["primary"], True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+            shapes.append(line_segment_xml(shape_id, "Progress Dotted Connector", emu(6.4), emu(y + 0.31), emu(7.2), emu(y + 0.31), theme["primary"], 6350, "dash"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Progress Content", emu(7.45), emu(y + 0.02), emu(3.9), emu(0.3), [paragraph_xml("CONTENTS A", FONT["micro"], theme["text"], True)]))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Progress Detail", emu(7.45), emu(y + 0.34), emu(4.0), emu(0.36), [paragraph_xml(label, FONT["micro"], theme["muted"])]))
+            shape_id += 1
+            y += 1.15
+        return shape_id
 
     if variant in {"vertical_columns", "split_panel"}:
         accent = theme_color(theme, chart.get("emphasis", "primary"))
@@ -929,6 +1310,7 @@ def render_line_trend(shapes, slide, theme, shape_id):
         return render_bullets(shapes, slide, theme, shape_id)
 
     accent = theme_color(theme, chart.get("emphasis", "primary"))
+    treatment = slide.get("visual_treatment", "standard")
     panel_x, panel_y, panel_w, panel_h = 0.85, 1.88, 11.65, 2.72
     shapes.append(
         text_box_xml(
@@ -992,6 +1374,16 @@ def render_line_trend(shapes, slide, theme, shape_id):
                 [paragraph_xml(clamp_text(item.get("label", ""), 10), 850, theme["muted"], True)],
             )
         )
+        shape_id += 1
+    if treatment in {"forecast_actual_line", "annotated_trend"}:
+        last_x, last_y, last_item = points[-1]
+        first_value = as_number(points[0][2].get("value", 0))
+        last_value = as_number(last_item.get("value", 0))
+        delta = last_value - first_value
+        delta_prefix = "+" if delta > 0 else ""
+        shapes.append(line_segment_xml(shape_id, "Trend Final Guide", emu(last_x), emu(chart_y - 0.08), emu(last_x), emu(chart_y + chart_h + 0.08), accent, 9525, "dash"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Trend Annotation", emu(8.25), emu(panel_y + 0.18), emu(3.3), emu(0.76), [paragraph_xml(clamp_text(last_item.get("label", "최종"), 18), FONT["caption"], theme["muted"], True), paragraph_xml(f"{last_value:g}{unit} ({delta_prefix}{delta:g}{unit})", FONT["body_large"], accent, True)], fill=theme["surface_alt"], line=accent, radius=True))
         shape_id += 1
     shapes.append(
         text_box_xml(
@@ -1103,16 +1495,22 @@ def render_comparison(shapes, slide, theme, shape_id):
     comps = [c for c in slide.get("components", []) if c.get("type") == "comparison"]
     left = comps[0].get("left", {}) if comps else {"title": "Before", "items": slide.get("bullets", [])[:3]}
     right = comps[0].get("right", {}) if comps else {"title": "After", "items": slide.get("bullets", [])[3:6]}
+    if slide.get("visual_treatment") == "two_column_scorecard":
+        shapes.append(text_box_xml(shape_id, "Scorecard Band", emu(0.85), emu(1.88), emu(11.55), emu(0.42), [paragraph_xml("비교 관점", FONT["label"], theme["muted"], True, "center")], fill=theme["surface_alt"], line=theme["line"], radius=True, anchor="ctr", margin_y=0))
+        shape_id += 1
     columns = [(left, theme["primary"], 0.85), (right, theme["accent"], 6.75)]
     for col, accent, x in columns:
+        if slide.get("visual_treatment") == "two_column_scorecard":
+            shapes.append(shape_xml(shape_id, "Scorecard Top Rule", emu(x), emu(2.48), emu(5.55), emu(0.08), accent, accent))
+            shape_id += 1
         shapes.append(
             text_box_xml(
                 shape_id,
                 "Comparison Column",
                 emu(x),
-                emu(1.95),
+                emu(2.42 if slide.get("visual_treatment") == "two_column_scorecard" else 1.95),
                 emu(5.55),
-                emu(3.2),
+                emu(2.88 if slide.get("visual_treatment") == "two_column_scorecard" else 3.2),
                 [paragraph_xml(clamp_text(col.get("title", ""), 30), 1500, accent, True)]
                 + [paragraph_xml("• " + clamp_text(item, 46), 1250, theme["text"]) for item in col.get("items", [])[:5]],
                 fill=theme["surface"],
@@ -1155,6 +1553,13 @@ def render_risk_matrix(shapes, slide, theme, shape_id):
         shape_id += 1
         shapes.append(text_box_xml(shape_id, "Risk Label", emu(px + 0.08), emu(py - 0.12), emu(1.35), emu(0.28), [paragraph_xml(clamp_text(item.get("label", ""), 16), 800, theme["text"], True)]))
         shape_id += 1
+    if slide.get("visual_treatment") == "quadrant_focus" and items:
+        top = max(items, key=lambda item: as_number(item.get("likelihood", 0.5), 0.5) * as_number(item.get("impact", 0.5), 0.5))
+        accent = theme_color(theme, top.get("emphasis", "warning"))
+        shapes.append(outlined_shape_xml(shape_id, "High Risk Focus", emu(mid_x), emu(y), emu(w / 2), emu(h / 2), accent, 25400, "roundRect"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Risk Focus Callout", emu(9.25), emu(1.55), emu(2.65), emu(0.62), [paragraph_xml("우선 점검", FONT["caption"], theme["muted"], True), paragraph_xml(clamp_text(top.get("label", ""), 22), FONT["label"], accent, True)], fill=theme["surface"], line=accent, radius=True))
+        shape_id += 1
     return shape_id
 
 
@@ -1167,6 +1572,11 @@ def render_cause_effect(shapes, slide, theme, shape_id):
         ("결과", comp.get("effects", slide.get("bullets", [])[4:6]), theme["accent"], 8.25),
     ]
     for idx, (title, items, accent, x) in enumerate(groups):
+        if slide.get("visual_treatment") == "cascade_flow":
+            shapes.append(shape_xml(shape_id, "Cascade Stage Chip", emu(x), emu(1.82), emu(0.54), emu(0.28), accent, accent, "roundRect"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Cascade Stage Number", emu(x), emu(1.86), emu(0.54), emu(0.16), [paragraph_xml(f"{idx + 1}", FONT["micro"], "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
         shapes.append(
             text_box_xml(
                 shape_id,
@@ -1260,7 +1670,41 @@ def render_title_cover(shapes, slide, theme, shape_id):
     kicker = slide.get("kicker") or "Presentation"
     title = slide.get("title") or "Untitled Deck"
     subtitle = slide.get("subtitle") or ""
-    variant = layout_variant(theme, "title_cover", "left_panel")
+    variant = layout_variant(theme, "title_cover", "left_panel", slide)
+    if variant == "blue_ribbon_title":
+        navy = theme.get("frame_color", theme["accent"])
+        shapes.append(shape_xml(shape_id, "Cover Navy Center Slab", emu(2.1), emu(2.35), emu(9.15), emu(1.38), navy, navy, "roundRect"))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Cover Blue Label Tab", emu(3.0), emu(2.05), emu(1.85), emu(0.38), theme["primary"], theme["primary"], "roundRect"))
+        shape_id += 1
+        shapes.append(outlined_shape_xml(shape_id, "Cover White Title Plate", emu(2.55), emu(2.64), emu(8.25), emu(0.72), "FFFFFF", 12700, "roundRect", "FFFFFF"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Cover Title", emu(2.82), emu(2.72), emu(7.72), emu(0.48), [paragraph_xml(clamp_text(title, 38), 2200, navy, True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Cover Orange Dot", emu(10.05), emu(2.88), emu(0.22), emu(0.22), theme["warning"], "FFFFFF", "ellipse"))
+        shape_id += 1
+        if subtitle:
+            shapes.append(text_box_xml(shape_id, "Cover Subtitle", emu(3.0), emu(3.9), emu(7.35), emu(0.42), [paragraph_xml(clamp_text(subtitle, 78), FONT["caption"], theme["muted"], False, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+        if kicker:
+            shapes.append(text_box_xml(shape_id, "Cover Kicker", emu(3.18), emu(2.09), emu(1.5), emu(0.26), [paragraph_xml(clamp_text(kicker, 18), FONT["micro"], "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+        return shape_id
+
+    if variant == "center_capsule_title":
+        shapes.append(outlined_shape_xml(shape_id, "Cover Center Capsule", emu(3.15), emu(2.62), emu(7.05), emu(0.78), theme["primary"], 19050, "roundRect", theme.get("title_fill", "FFFFFF")))
+        shape_id += 1
+        shapes.append(line_segment_xml(shape_id, "Cover Capsule Dots", emu(3.32), emu(3.29), emu(9.98), emu(3.29), theme["primary"], 6350, "dash"))
+        shape_id += 1
+        shapes.append(outlined_shape_xml(shape_id, "Cover Handle", emu(6.35), emu(2.18), emu(0.78), emu(0.1), theme["primary"], 9525, "roundRect", "FFFFFF"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Cover Title", emu(3.42), emu(2.74), emu(6.45), emu(0.5), [paragraph_xml(clamp_text(title, 34), 2200, theme["primary"], True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        if subtitle:
+            shapes.append(text_box_xml(shape_id, "Cover Subtitle", emu(4.05), emu(3.58), emu(5.2), emu(0.34), [paragraph_xml(clamp_text(subtitle, 70), FONT["micro"], "FFFFFF", False, "center")], anchor="ctr", margin_x=0, margin_y=0))
+            shape_id += 1
+        return shape_id
+
     if variant in {"centered_badge", "weather_alert"}:
         shapes.append(translucent_shape_xml(shape_id, "Cover Badge", emu(2.0), emu(1.15), emu(9.35), emu(4.75), theme["surface_alt"], 64000, "roundRect"))
         shape_id += 1
@@ -1338,8 +1782,29 @@ def render_title_cover(shapes, slide, theme, shape_id):
 
 
 def render_takeaway(shapes, slide, theme, shape_id):
-    variant = layout_variant(theme, "takeaway", "summary_panel")
+    variant = layout_variant(theme, "takeaway", "summary_panel", slide)
     bullets = slide.get("bullets", [])[:4]
+    if variant == "ribbon_summary":
+        navy = theme.get("frame_color", theme["accent"])
+        shapes.append(shape_xml(shape_id, "Takeaway Navy Block", emu(0.95), emu(1.78), emu(3.15), emu(3.9), navy, navy, "roundRect"))
+        shape_id += 1
+        shapes.append(shape_xml(shape_id, "Takeaway Blue Tab", emu(3.72), emu(2.2), emu(0.62), emu(0.58), theme["primary"], theme["primary"], "roundRect"))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Takeaway Label", emu(1.35), emu(2.18), emu(2.35), emu(0.38), [paragraph_xml("CONTENTS", 1150, "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        shapes.append(text_box_xml(shape_id, "Takeaway Lead", emu(1.25), emu(2.78), emu(2.55), emu(1.35), [paragraph_xml(clamp_text(slide.get("title", "핵심 메시지"), 28), 1800, "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
+        shape_id += 1
+        y = 1.95
+        for idx, bullet in enumerate(bullets[:3]):
+            shapes.append(text_box_xml(shape_id, "Takeaway Ribbon Item", emu(4.75), emu(y), emu(6.95), emu(0.72), [], fill=theme["surface"], line=theme["line"], radius=True))
+            shape_id += 1
+            shapes.append(shape_xml(shape_id, "Takeaway Item Dot", emu(5.05), emu(y + 0.25), emu(0.18), emu(0.18), theme["warning"] if idx == 0 else theme["primary"], None, "ellipse"))
+            shape_id += 1
+            shapes.append(text_box_xml(shape_id, "Takeaway Item Text", emu(5.42), emu(y + 0.15), emu(5.85), emu(0.34), [paragraph_xml(clamp_text(bullet, 54), 1250, theme["text"], True)], anchor="ctr", margin_y=0))
+            shape_id += 1
+            y += 0.95
+        return shape_id
+
     if variant in {"quote_band", "forecast_brief"}:
         shapes.append(translucent_shape_xml(shape_id, "Takeaway Band", emu(0), emu(2.05), SLIDE_W, emu(2.45), theme["surface_alt"], 60000))
         shape_id += 1
@@ -1572,9 +2037,9 @@ def theme_xml(theme):
       <a:accent5><a:srgbClr val="7C3AED"/></a:accent5><a:accent6><a:srgbClr val="2563EB"/></a:accent6>
       <a:hlink><a:srgbClr val="{theme["primary"]}"/></a:hlink><a:folHlink><a:srgbClr val="{theme["accent"]}"/></a:folHlink>
     </a:clrScheme>
-    <a:fontScheme name="Aptos">
-      <a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface="Malgun Gothic"/><a:cs typeface="Aptos"/></a:majorFont>
-      <a:minorFont><a:latin typeface="Aptos"/><a:ea typeface="Malgun Gothic"/><a:cs typeface="Aptos"/></a:minorFont>
+    <a:fontScheme name="{TYPEFACE_LATIN}">
+      <a:majorFont><a:latin typeface="{TYPEFACE_LATIN}"/><a:ea typeface="{TYPEFACE_EAST_ASIAN}"/><a:cs typeface="{TYPEFACE_COMPLEX}"/></a:majorFont>
+      <a:minorFont><a:latin typeface="{TYPEFACE_LATIN}"/><a:ea typeface="{TYPEFACE_EAST_ASIAN}"/><a:cs typeface="{TYPEFACE_COMPLEX}"/></a:minorFont>
     </a:fontScheme>
     <a:fmtScheme name="Simple">
       <a:fillStyleLst>
@@ -1627,6 +2092,238 @@ def app_xml(slide_count):
 </Properties>"""
 
 
+def component_types(slide):
+    return {safe_text(c.get("type")) for c in slide.get("components", []) if isinstance(c, dict)}
+
+
+def infer_layout_from_evidence(slide):
+    evidence = safe_text(slide.get("evidence_type", "")).lower()
+    types = component_types(slide)
+    if "line_chart" in types or "time_series" in evidence or "forecast" in evidence:
+        return "line_trend"
+    if "bar_chart" in types or "category_comparison" in evidence:
+        return "bar_comparison"
+    if "metric_card" in types or "headline_metrics" in evidence:
+        return "metric_dashboard"
+    if "risk_matrix" in types or "risk" in evidence or "uncertainty" in evidence:
+        return "risk_matrix"
+    if "cause_effect" in types or "cause_effect" in evidence:
+        return "cause_effect"
+    if "timeline" in types or "dated_sequence" in evidence:
+        return "timeline"
+    if "process_flow" in types or "workflow" in evidence:
+        return "process_flow"
+    if "architecture_map" in types or "architecture" in evidence:
+        return "architecture_map"
+    if "comparison" in types:
+        return "comparison"
+    if "callout" in types and slide.get("layout") not in {"takeaway", "title_cover"}:
+        return "callout_focus"
+    return slide.get("layout", "bullets")
+
+
+def choose_visual_treatment(slide):
+    layout = slide.get("layout", "bullets")
+    story = safe_text(slide.get("_story_archetype", "")).lower()
+    types = component_types(slide)
+    components = slide.get("components", [])
+    title_text = safe_text(slide.get("title", "")).lower()
+    if layout == "metric_dashboard":
+        metrics = [c for c in components if c.get("type") == "metric_card"]
+        if story in {"decision_brief", "risk_monitoring"} and len(metrics) >= 2:
+            return "hero_metric_panel"
+        if len(metrics) >= 3:
+            return "hero_metric_strip"
+        return "hero_metric_panel"
+    if layout == "bar_comparison":
+        chart = next((c for c in components if c.get("type") == "bar_chart"), {})
+        data_len = len(chart.get("data", []))
+        if story in {"risk_monitoring", "decision_brief"} and data_len >= 4:
+            return "ranked_bars"
+        if data_len >= 5:
+            return "ranked_bars"
+        if any(word in title_text for word in ["예상", "전망", "실제", "상회", "before", "after"]):
+            return "benchmark_bars"
+        return "highlight_top_bar"
+    if layout == "line_trend":
+        if any(word in title_text for word in ["예상", "전망", "실제", "상회", "forecast"]):
+            return "forecast_actual_line"
+        return "annotated_trend"
+    if layout == "cause_effect":
+        return "cascade_flow"
+    if layout == "risk_matrix":
+        return "quadrant_focus"
+    if layout == "comparison":
+        return "two_column_scorecard"
+    if layout == "takeaway" and "callout" in types:
+        return "callout_takeaway"
+    return "standard"
+
+
+def preflight_slide(slide):
+    inferred_layout = infer_layout_from_evidence(slide)
+    if slide.get("layout") in {"bullets", "title_summary"} and inferred_layout not in {"bullets", "title_summary"}:
+        slide["layout"] = inferred_layout
+    elif component_types(slide) and inferred_layout != slide.get("layout") and slide.get("layout") not in {"title_cover", "takeaway"}:
+        slide["layout"] = inferred_layout
+    slide.setdefault("variant", "auto")
+    slide.setdefault("visual_treatment", choose_visual_treatment(slide))
+    return slide
+
+
+def infer_story_archetype(deckspec):
+    requested = safe_text(deckspec.get("story_archetype", "")).lower()
+    if requested and requested != "auto":
+        return requested
+    slides = deckspec.get("slides", [])
+    layouts = [safe_text(slide.get("layout", "")).lower() for slide in slides]
+    text = " ".join(
+        safe_text(value)
+        for slide in slides
+        for value in [
+            slide.get("kicker", ""),
+            slide.get("title", ""),
+            slide.get("subtitle", ""),
+            slide.get("evidence_type", ""),
+            slide.get("layout_reason", ""),
+        ]
+    ).lower()
+    if "architecture_map" in layouts or any(word in text for word in ["architecture", "아키텍처", "하네스", "a2a", "agent", "에이전트", "모델 라우팅"]):
+        return "architecture_brief"
+    if "timeline" in layouts or any(word in text for word in ["연표", "타임라인", "일정", "chronology"]):
+        return "timeline_brief"
+    if "cause_effect" in layouts or any(word in text for word in ["파급", "확산", "원인", "영향", "전이", "trigger"]):
+        return "cause_to_effect"
+    if "risk_matrix" in layouts and any(word in text for word in ["리스크", "위험", "불확실", "전망", "monitoring"]):
+        return "risk_monitoring"
+    if "comparison" in layouts and any(word in text for word in ["결정", "판단", "선택", "trade", "의사결정"]):
+        return "decision_brief"
+    if any(layout in layouts for layout in ["metric_dashboard", "bar_comparison", "line_trend"]):
+        return "data_brief"
+    return "explainer"
+
+
+def narrative_rank(story_archetype, slide, original_index):
+    layout = slide.get("layout", "bullets")
+    if layout == "title_cover":
+        return (-100, original_index)
+    if layout == "takeaway":
+        return (1000, original_index)
+    role_orders = {
+        "data_brief": {
+            "metric_dashboard": 10,
+            "line_trend": 20,
+            "bar_comparison": 30,
+            "comparison": 40,
+            "cause_effect": 50,
+            "risk_matrix": 60,
+            "title_summary": 70,
+            "callout_focus": 80,
+            "process_flow": 90,
+            "timeline": 95,
+            "architecture_map": 100,
+            "bullets": 110,
+        },
+        "cause_to_effect": {
+            "cause_effect": 10,
+            "metric_dashboard": 20,
+            "bar_comparison": 30,
+            "line_trend": 35,
+            "comparison": 40,
+            "risk_matrix": 50,
+            "timeline": 60,
+            "title_summary": 70,
+            "callout_focus": 80,
+            "process_flow": 90,
+            "architecture_map": 100,
+            "bullets": 110,
+        },
+        "risk_monitoring": {
+            "risk_matrix": 10,
+            "metric_dashboard": 20,
+            "line_trend": 30,
+            "bar_comparison": 40,
+            "cause_effect": 50,
+            "comparison": 60,
+            "timeline": 70,
+            "title_summary": 80,
+            "callout_focus": 90,
+            "process_flow": 100,
+            "architecture_map": 110,
+            "bullets": 120,
+        },
+        "decision_brief": {
+            "comparison": 10,
+            "metric_dashboard": 20,
+            "bar_comparison": 30,
+            "line_trend": 35,
+            "risk_matrix": 40,
+            "process_flow": 50,
+            "cause_effect": 60,
+            "title_summary": 70,
+            "callout_focus": 80,
+            "timeline": 90,
+            "architecture_map": 100,
+            "bullets": 110,
+        },
+        "explainer": {
+            "title_summary": 10,
+            "cause_effect": 20,
+            "process_flow": 30,
+            "architecture_map": 35,
+            "metric_dashboard": 40,
+            "bar_comparison": 50,
+            "line_trend": 55,
+            "comparison": 60,
+            "risk_matrix": 70,
+            "timeline": 80,
+            "callout_focus": 90,
+            "bullets": 100,
+        },
+        "timeline_brief": {
+            "timeline": 10,
+            "line_trend": 20,
+            "metric_dashboard": 30,
+            "cause_effect": 40,
+            "bar_comparison": 50,
+            "comparison": 60,
+            "risk_matrix": 70,
+            "title_summary": 80,
+            "callout_focus": 90,
+            "process_flow": 100,
+            "architecture_map": 110,
+            "bullets": 120,
+        },
+        "architecture_brief": {
+            "architecture_map": 10,
+            "process_flow": 20,
+            "comparison": 30,
+            "metric_dashboard": 40,
+            "cause_effect": 50,
+            "risk_matrix": 60,
+            "bar_comparison": 70,
+            "line_trend": 75,
+            "title_summary": 80,
+            "callout_focus": 90,
+            "timeline": 100,
+            "bullets": 110,
+        },
+    }
+    order = role_orders.get(story_archetype, role_orders["data_brief"])
+    return (order.get(layout, 500), original_index)
+
+
+def apply_narrative_order(deckspec, story_archetype):
+    design = deckspec.get("design", {})
+    mode = safe_text(design.get("narrative_order", "auto")).lower()
+    if mode in {"preserve", "manual", "off", "none"}:
+        return deckspec["slides"]
+    indexed = list(enumerate(deckspec["slides"], 1))
+    ordered = sorted(indexed, key=lambda item: narrative_rank(story_archetype, item[1], item[0]))
+    deckspec["slides"] = [slide for _, slide in ordered]
+    return deckspec["slides"]
+
+
 def normalize_deckspec(deckspec):
     if not isinstance(deckspec, dict):
         raise ValueError("DeckSpec must be a JSON object.")
@@ -1634,16 +2331,22 @@ def normalize_deckspec(deckspec):
     if not isinstance(slides, list) or not slides:
         raise ValueError("DeckSpec must include a non-empty slides array.")
     deckspec.setdefault("design", {"theme": "policy_brief"})
+    story_archetype = infer_story_archetype(deckspec)
+    deckspec["story_archetype"] = story_archetype
     for idx, slide in enumerate(slides, 1):
         if not isinstance(slide, dict):
             raise ValueError(f"Slide {idx} must be an object.")
+        slide["_story_archetype"] = story_archetype
         slide.setdefault("layout", "bullets")
+        slide.setdefault("variant", "auto")
         slide.setdefault("kicker", deckspec.get("deck_title", ""))
         slide.setdefault("title", f"Slide {idx}")
         slide.setdefault("subtitle", "")
         slide.setdefault("bullets", [])
         slide.setdefault("components", [])
         slide.setdefault("speaker_note", "")
+        preflight_slide(slide)
+    apply_narrative_order(deckspec, story_archetype)
     return deckspec
 
 

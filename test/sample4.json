@@ -1,0 +1,217 @@
+{
+  "deck_title": "고유가發 인플레이션 확산과 금리 전망",
+  "subtitle": "2026년 5월 소비자물가 상승 및 향후 리스크 분석",
+  "design": {
+    "theme": "policy_brief",
+    "template": "auto_random",
+    "tone": "calm_analytical",
+    "density": "medium",
+    "visual_style": "policy_report"
+  },
+  "slides": [
+    {
+      "layout": "title_cover",
+      "title": "고유가發 인플레이션 확산",
+      "subtitle": "생활물가 상승과 기준금리 인상 전망",
+      "visual_plan": {
+        "primary_element": "callout",
+        "shape_language": "panels",
+        "background_mood": "clean_report",
+        "accent_usage": "primary for main message",
+        "layout_reason": "보고서 성격의 정책 브리핑 표지"
+      }
+    },
+    {
+      "layout": "title_summary",
+      "title": "핵심 요약",
+      "bullets": [
+        "5월 소비자물가 3.1% 상승",
+        "생활물가 3.3%로 체감 부담 확대",
+        "석유류 24.2% 급등이 상승 주도",
+        "7월 기준금리 인상 전망 강화"
+      ],
+      "visual_plan": {
+        "primary_element": "bullet_cards",
+        "shape_language": "cards",
+        "background_mood": "clean_report",
+        "accent_usage": "primary for summary",
+        "layout_reason": "전체 기사의 핵심 메시지 요약"
+      }
+    },
+    {
+      "layout": "metric_dashboard",
+      "title": "물가 상승 주요 지표",
+      "components": [
+        {
+          "type": "metric_card",
+          "label": "소비자물가 상승률",
+          "value": "3.1%",
+          "delta": "+3.1% YoY",
+          "context": "2024년 3월 이후 첫 3%대",
+          "emphasis": "primary"
+        },
+        {
+          "type": "metric_card",
+          "label": "생활물가 상승률",
+          "value": "3.3%",
+          "delta": "+3.3% YoY",
+          "context": "전체 물가보다 높음",
+          "emphasis": "accent"
+        },
+        {
+          "type": "metric_card",
+          "label": "석유류 물가",
+          "value": "24.2%",
+          "delta": "+24.2% YoY",
+          "context": "3년 10개월 만 최고 수준",
+          "emphasis": "warning"
+        }
+      ],
+      "visual_plan": {
+        "primary_element": "metric_cards",
+        "shape_language": "cards",
+        "background_mood": "clean_report",
+        "accent_usage": "warning for inflation risk",
+        "layout_reason": "핵심 수치를 한눈에 전달"
+      }
+    },
+    {
+      "layout": "bar_comparison",
+      "title": "품목별 가격 상승 비교",
+      "components": [
+        {
+          "type": "bar_chart",
+          "title": "주요 품목 상승률",
+          "unit": "%",
+          "data": [
+            {
+              "label": "경유",
+              "value": 33.3
+            },
+            {
+              "label": "휘발유",
+              "value": 23.1
+            },
+            {
+              "label": "갈치",
+              "value": 15.1
+            },
+            {
+              "label": "달걀",
+              "value": 10.2
+            },
+            {
+              "label": "수입소고기",
+              "value": 7.6
+            }
+          ],
+          "emphasis": "warning"
+        }
+      ],
+      "visual_plan": {
+        "primary_element": "bar_chart",
+        "shape_language": "bars",
+        "background_mood": "clean_report",
+        "accent_usage": "warning for price surge",
+        "layout_reason": "품목별 상승폭 비교가 중요"
+      }
+    },
+    {
+      "layout": "cause_effect",
+      "title": "고유가의 2차 파급효과",
+      "components": [
+        {
+          "type": "cause_effect",
+          "causes": [
+            "중동 전쟁 장기화",
+            "국제유가 상승",
+            "석유화학 원재료 가격 상승"
+          ],
+          "events": [
+            "석유류 물가 급등",
+            "공업제품 가격 상승",
+            "서비스 물가 상승"
+          ],
+          "effects": [
+            "생활물가 부담 확대",
+            "근원물가 상승",
+            "인플레이션 압력 확산"
+          ]
+        }
+      ],
+      "visual_plan": {
+        "primary_element": "cause_effect",
+        "shape_language": "nodes",
+        "background_mood": "clean_report",
+        "accent_usage": "primary for transmission path",
+        "layout_reason": "유가 충격의 확산 경로 설명"
+      }
+    },
+    {
+      "layout": "risk_matrix",
+      "title": "향후 물가 리스크",
+      "components": [
+        {
+          "type": "risk_matrix",
+          "items": [
+            {
+              "label": "폭염에 따른 신선식품 가격 상승",
+              "likelihood": 0.8,
+              "impact": 0.7,
+              "emphasis": "warning"
+            },
+            {
+              "label": "폭우에 따른 수급 차질",
+              "likelihood": 0.7,
+              "impact": 0.8,
+              "emphasis": "warning"
+            },
+            {
+              "label": "중동 정세 악화",
+              "likelihood": 0.6,
+              "impact": 0.9,
+              "emphasis": "warning"
+            },
+            {
+              "label": "서비스물가 고착화",
+              "likelihood": 0.8,
+              "impact": 0.8,
+              "emphasis": "primary"
+            }
+          ]
+        }
+      ],
+      "visual_plan": {
+        "primary_element": "risk_matrix",
+        "shape_language": "dots",
+        "background_mood": "clean_report",
+        "accent_usage": "warning for future risks",
+        "layout_reason": "물가 상방 위험 요인 평가"
+      }
+    },
+    {
+      "layout": "takeaway",
+      "title": "정책 시사점 및 전망",
+      "bullets": [
+        "한은의 7월 기준금리 0.25%p 인상 전망 우세",
+        "근원물가 2.5%로 상승 압력 확산 확인",
+        "개인서비스 물가 3.7% 상승으로 고착화 우려",
+        "최종금리 3.0~3.25% 가능성 제기"
+      ],
+      "visual_plan": {
+        "primary_element": "callout",
+        "shape_language": "panels",
+        "background_mood": "executive_frame",
+        "accent_usage": "primary for conclusion",
+        "layout_reason": "정책 판단과 향후 전망 정리"
+      },
+      "components": [
+        {
+          "type": "callout",
+          "headline": "인플레이션이 에너지 가격을 넘어 경제 전반으로 확산",
+          "body": "고유가의 2차 파급효과와 이상기후 리스크로 물가 상승세가 당분간 지속될 가능성이 높다."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "deck_title": "고유가發 생활물가 압력 확대",
+  "subtitle": "2026년 5월 소비자물가와 7월 기준금리 전망",
+  "design": {
+    "theme": "auto",
+    "template": "auto_random",
+    "tone": "calm_analytical",
+    "density": "medium",
+    "visual_style": "policy_report"
+  },
+  "slides": [
+    {
+      "layout": "title_cover",
+      "variant": "auto",
+      "kicker": "Inflation Brief",
+      "title": "고유가發 생활물가 압력 확대",
+      "subtitle": "석유류 급등이 서비스·먹거리·금리 전망으로 확산"
+    },
+    {
+      "layout": "line_trend",
+      "variant": "auto",
+      "kicker": "물가 흐름",
+      "title": "5월 물가, 예상보다 빠르게 3%대 진입",
+      "bullets": [
+        "5월 소비자물가 상승률은 시장 예상 중간값 2.9%를 상회",
+        "2024년 3월 이후 2년 2개월 만에 3%대 재진입"
+      ],
+      "components": [
+        {
+          "type": "line_chart",
+          "title": "소비자물가 상승률 흐름",
+          "unit": "%",
+          "data": [
+            {
+              "label": "시장예상",
+              "value": 2.9
+            },
+            {
+              "label": "최고전망",
+              "value": 3.0
+            },
+            {
+              "label": "5월실제",
+              "value": 3.1
+            }
+          ],
+          "emphasis": "warning"
+        }
+      ],
+      "speaker_note": "시장 예상치를 웃돈 3.1% 상승률이 이번 물가 불안의 출발점임을 강조한다."
+    },
+    {
+      "layout": "metric_dashboard",
+      "variant": "auto",
+      "kicker": "핵심 수치",
+      "title": "생활물가와 석유류가 상승세를 주도",
+      "bullets": [
+        "생활물가지수는 전년 대비 3.3% 상승",
+        "석유류 물가는 3년 10개월 만에 최고 수준"
+      ],
+      "components": [
+        {
+          "type": "metric_card",
+          "label": "소비자물가",
+          "value": "3.1%",
+          "delta": "전년 동월 대비",
+          "context": "2024년 3월 이후 첫 3%대",
+          "emphasis": "primary"
+        },
+        {
+          "type": "metric_card",
+          "label": "생활물가",
+          "value": "3.3%",
+          "delta": "전체 물가보다 높음",
+          "context": "체감 물가 부담 확대",
+          "emphasis": "accent"
+        },
+        {
+          "type": "metric_card",
+          "label": "석유류",
+          "value": "24.2%",
+          "delta": "급등",
+          "context": "전체 물가지수 상승 견인",
+          "emphasis": "warning"
+        }
+      ],
+      "speaker_note": "소비자물가, 생활물가, 석유류 상승률을 한 장에서 비교해 체감 부담과 원인을 연결한다."
+    },
+    {
+      "layout": "bar_comparison",
+      "variant": "auto",
+      "kicker": "품목별 충격",
+      "title": "연료비와 먹거리 가격이 동반 상승",
+      "bullets": [
+        "경유와 휘발유 상승률이 교통물가를 밀어올림",
+        "달걀·갈치·조기 등 먹거리 품목도 큰 폭 상승"
+      ],
+      "components": [
+        {
+          "type": "bar_chart",
+          "title": "주요 품목 전년 대비 상승률",
+          "unit": "%",
+          "data": [
+            {
+              "label": "경유",
+              "value": 33.3
+            },
+            {
+              "label": "휘발유",
+              "value": 23.1
+            },
+            {
+              "label": "갈치",
+              "value": 15.1
+            },
+            {
+              "label": "조기",
+              "value": 14.6
+            },
+            {
+              "label": "달걀",
+              "value": 10.2
+            }
+          ],
+          "emphasis": "warning"
+        }
+      ],
+      "speaker_note": "항목별 상승률은 단순 bullet보다 막대 비교가 적합하므로 bar_chart로 표현한다."
+    },
+    {
+      "layout": "cause_effect",
+      "variant": "auto",
+      "kicker": "파급 경로",
+      "title": "유가 충격이 서비스 물가로 번짐",
+      "bullets": [
+        "근원물가 상승 폭이 전월 2.2%에서 2.5%로 확대",
+        "개인서비스 물가는 3.7%, 외식 이외 서비스는 4.4% 상승"
+      ],
+      "components": [
+        {
+          "type": "cause_effect",
+          "causes": [
+            "중동 전쟁 장기화",
+            "국제유가 고공행진",
+            "석유화학 원재료 가격 상승"
+          ],
+          "events": [
+            "석유류 24.2% 급등",
+            "교통물가 11.6% 상승",
+            "공업제품·서비스 가격 전이"
+          ],
+          "effects": [
+            "생활물가 3.3% 상승",
+            "근원물가 2.5%로 확대",
+            "7월 금리인상 명분 강화"
+          ]
+        }
+      ],
+      "speaker_note": "한은이 말한 유가 2차 파급효과를 원인-사건-결과 구조로 보여준다."
+    },
+    {
+      "layout": "risk_matrix",
+      "variant": "auto",
+      "kicker": "상방 리스크",
+      "title": "여름 변수와 중동 정세가 추가 압력",
+      "bullets": [
+        "폭염·폭우는 신선식품 물가를 다시 자극할 수 있음",
+        "중동 상황 악화 시 유가가 더 높게 오래 유지될 가능성"
+      ],
+      "components": [
+        {
+          "type": "risk_matrix",
+          "items": [
+            {
+              "label": "서비스물가 고착화",
+              "likelihood": 0.8,
+              "impact": 0.8,
+              "emphasis": "primary"
+            },
+            {
+              "label": "폭염·폭우",
+              "likelihood": 0.7,
+              "impact": 0.75,
+              "emphasis": "warning"
+            },
+            {
+              "label": "중동 정세 악화",
+              "likelihood": 0.6,
+              "impact": 0.9,
+              "emphasis": "warning"
+            },
+            {
+              "label": "먹거리 수급 불안",
+              "likelihood": 0.65,
+              "impact": 0.65,
+              "emphasis": "accent"
+            }
+          ]
+        }
+      ],
+      "speaker_note": "향후 물가 상방 압력을 가능성과 영향도로 구분한다."
+    },
+    {
+      "layout": "takeaway",
+      "variant": "auto",
+      "kicker": "Policy Takeaway",
+      "title": "7월 인상 가능성이 정책 초점으로 부상",
+      "bullets": [
+        "시장에서는 7월 기준금리 0.25%p 인상 가능성을 기정사실화",
+        "근원물가와 서비스 물가 상승은 일시 충격을 넘어선 확산 신호",
+        "최종금리 전망은 3.0%에서 3.25%까지 열어둘 필요가 제기"
+      ],
+      "components": [
+        {
+          "type": "callout",
+          "headline": "물가 충격은 에너지에서 생활물가와 서비스로 이동 중",
+          "body": "향후 판단의 핵심은 유가 자체보다 2차 파급효과와 신선식품 리스크의 지속성이다."
+        }
+      ],
+      "speaker_note": "결론은 7월 금리 인상 가능성과 최종금리 상단 재검토로 정리한다."
+    }
+  ]
+}

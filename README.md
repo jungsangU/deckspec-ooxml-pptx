@@ -4,6 +4,8 @@ DeckSpec JSON을 입력받아 PowerPoint 내부 언어인 OOXML 파일들을 직
 
 LLM은 발표 내용과 디자인 의도를 `DeckSpec JSON`으로 만들고, 이 스크립트는 JSON을 안정적인 OOXML/PPTX로 렌더링하는 역할을 합니다.
 
+현재 렌더러는 한국어 가독성을 위해 무료 폰트인 `Pretendard`를 우선 typeface로 지정합니다. 폰트 파일을 PPTX에 임베드하지는 않으므로, PowerPoint를 여는 환경에 Pretendard가 설치되어 있으면 적용되고 없으면 시스템 대체 폰트로 표시됩니다.
+
 ## Files
 
 ```text
@@ -60,6 +62,7 @@ base_ooxml/
 ```text
 DeckSpec JSON
 ├── design.theme
+├── story_archetype
 ├── slide.layout
 ├── components
 └── bullets / metrics / chart data
@@ -126,7 +129,48 @@ template_profiles.json
 └── 현재 DeckSpec 슬라이드에 적용
 ```
 
-`layout_variants`는 같은 DeckSpec 레이아웃을 템플릿마다 다르게 그리도록 만듭니다. 예를 들어 `metric_dashboard`는 기본 카드형, 스코어보드형, 세로 테이블형, 스태거 카드형으로 달라질 수 있고, `bar_comparison`은 가로 막대, 세로 컬럼, lollipop 차트로 달라질 수 있습니다.
+`layout_variants`는 같은 DeckSpec 레이아웃을 템플릿마다 다르게 그리도록 만듭니다. 예를 들어 `metric_dashboard`는 기본 카드형, 스코어보드형, 세로 테이블형, 스태거 카드형, 원형 버블형으로 달라질 수 있고, `bar_comparison`은 가로 막대, 세로 컬럼, lollipop 차트, 진행률 행으로 달라질 수 있습니다.
+
+`layout_variants`는 문자열 하나 또는 후보 풀을 받을 수 있습니다. 후보 풀이 있으면 렌더러가 슬라이드 내용과 덱 안의 반복도를 보고 자동으로 하나를 고릅니다.
+
+```json
+{
+  "layout_variants": {
+    "metric_dashboard": {
+      "default": "radial_bubbles",
+      "candidates": ["radial_bubbles", "scoreboard", "vertical_stack"]
+    }
+  }
+}
+```
+
+슬라이드별로 강제하고 싶으면 DeckSpec 슬라이드에 `variant` 또는 `preferred_variant`를 넣습니다. 생략하거나 `"auto"`로 두면 자동 선택됩니다. 일반적으로 LLM은 각 슬라이드의 `layout`과 `components`를 내용 기준으로 결정하고, `variant`, 좌표, 글자 크기, 도형 간격은 렌더러에 맡기는 것이 좋습니다.
+
+```json
+{
+  "layout": "metric_dashboard",
+  "variant": "auto"
+}
+```
+
+권장 흐름은 `텍스트 입력 -> LLM이 slide별 layout/components 결정 -> renderer가 variant/배치/OOXML 생성 -> PPTX 저장`입니다. LLM JSON에는 `x`, `y`, `font_size`, `shape_position` 같은 저수준 배치값을 넣지 마세요.
+
+LLM이 JSON을 만들 때는 먼저 `story_archetype`을 고르게 하는 것이 좋습니다. 이 값은 덱의 이야기 흐름을 정합니다. 예를 들어 숫자와 지표 중심이면 `data_brief`, 원인과 파급 경로가 중심이면 `cause_to_effect`, 미래 변수와 리스크가 중심이면 `risk_monitoring`, AI 하네스나 A2A 같은 시스템 구조 설명이면 `architecture_brief`가 적합합니다.
+
+렌더러는 기본적으로 `story_archetype`과 슬라이드 evidence/component를 보고 중간 슬라이드 순서를 자동 보정합니다. 표지는 앞에, 결론은 뒤에 유지하고, 본문 슬라이드는 내용 흐름에 맞게 재배열합니다. 사용자가 JSON 순서를 그대로 유지하고 싶으면 `design.narrative_order`를 `"preserve"`로 지정합니다.
+
+```json
+{
+  "design": {
+    "narrative_order": "preserve"
+  }
+}
+```
+
+일부 프로필은 더 강한 구조 템플릿을 갖습니다. 예를 들어 `mint_dotted_business` 스타일은 민트 도트 배경, 두꺼운 라운드 프레임, 캡슐형 헤더, 진행률 행, 도넛 지표 레이아웃을 직접 그립니다.
+`blue_ribbon_business` 스타일은 파란 리본형 표지, 상단 리본 헤더, 원형 지표 버블, 파란 진행 행, 리본 요약 패널을 직접 그립니다. 텍스트가 도형 중앙에서 어긋나지 않도록 주요 라벨에는 가운데 정렬과 중앙 앵커를 적용합니다.
+
+렌더러는 공통 타이포 스케일을 사용하고, 모든 텍스트를 최소 9.5pt 이상으로 보정합니다. 템플릿별 구조 variant도 이 스케일을 따르므로 템플릿이 바뀌어도 라벨, 본문, 지표 숫자의 크기가 갑자기 작아지지 않도록 설계되어 있습니다.
 
 특정 템플릿을 고정하고 싶으면 프로필의 `name` 값을 넣습니다.
 
@@ -214,9 +258,12 @@ qlmanage -t -s 1200 -o . output.pptx
 {
   "deck_title": "Deck title",
   "subtitle": "Optional subtitle",
+  "story_archetype": "data_brief",
+  "story_reason": "Numbers and comparisons drive the message.",
   "design": {
     "theme": "policy_brief",
     "template": "auto_random",
+    "narrative_order": "auto",
     "tone": "calm_analytical",
     "density": "medium",
     "visual_style": "clean_data_brief"
@@ -418,160 +465,20 @@ Used with `callout_focus`.
 
 ## LLM Prompt For DeckSpec JSON
 
-다른 세션에서 LLM에게 DeckSpec JSON을 만들게 할 때는 아래 프롬프트를 사용하세요.
+다른 세션에서 LLM에게 DeckSpec JSON을 만들게 할 때는 [프롬프트.txt](/Users/jsy/Documents/Codex/2026-05-31/new-chat/deckspec-ooxml-pptx/프롬프트.txt)를 그대로 사용하세요.
 
-LLM은 원문을 요약하고, 슬라이드 장수와 디자인을 판단한 뒤, 이 스크립트가 렌더링할 수 있는 JSON만 반환해야 합니다.
+사용 방법:
 
-```text
-You are a senior presentation strategist and information designer.
+1. `프롬프트.txt` 전체를 LLM에게 붙여넣습니다.
+2. 맨 아래 `SOURCE_TEXT` 영역의 `Paste the user's source text here.`를 원문으로 교체합니다.
+3. LLM이 반환한 JSON을 `test/your_file.json` 같은 파일로 저장합니다.
+4. 아래 명령으로 PPTX를 생성합니다.
 
-Convert the source text into a DeckSpec JSON for the provided Python OOXML PPTX renderer.
-
-Return valid JSON only.
-Do not return markdown.
-Do not explain your choices outside the JSON.
-
-Rules:
-- Create 3 to 6 slides unless the source text clearly requires fewer or more.
-- Preserve important source numbers exactly.
-- Do not invent facts, sources, dates, numbers, company names, or claims.
-- Use concise Korean business presentation language.
-- Keep each bullet short enough for a slide.
-- Choose the most suitable design.theme from the allowed theme list. Use "auto" when the source text gives enough clues for content-aware theme selection.
-- Choose each slide.layout from the allowed layout list.
-- Use metric_card components for important headline numbers.
-- Use bar_chart components when comparing numeric values.
-- Use line_chart components for time-series or repeated incident history.
-- Use timeline components when exact event order matters.
-- Use process_flow components for operational steps.
-- Use risk_matrix components when likelihood and impact should be compared.
-- Use cause_effect components when causes, event, and effects should be separated.
-- Use architecture_map components for systems, agents, tools, model routing, or harness/A2A explanations.
-- Use callout components for a strong single-message slide.
-- Use bullets when the slide is mostly explanatory.
-- Use takeaway for the final executive conclusion.
-- If a layout requires components, include components.
-- If a slide has components, it may also include bullets for supporting context.
-- Keep slide titles under 34 Korean characters when possible.
-- Keep bullets short. The renderer will cap overflowing bullets, but the JSON should still be slide-friendly.
-
-Allowed design.theme values:
-- auto: content-aware theme selection by renderer
-- policy_brief: sober public-policy or research brief
-- executive_summary: CEO/board-level concise business summary
-- data_report: analytical report with numbers and comparisons
-- canva_modern_pitch: dark modern pitch deck style
-- canva_warm_editorial: warm editorial/report style
-- canva_fresh_startup: fresh startup/product style
-- crisis_brief: incident, safety, risk, accident, emergency, or audit brief
-- tech_architecture: AI, software architecture, harness, A2A, agent systems
-- strategy_board: strategy, roadmap, investment, transformation, board memo
-- weather_risk: typhoon, heavy rain, heat wave, forecast, weather warning brief
-
-Allowed design.template values:
-- auto_random: randomly select one profile from template_profiles.json
-- none: do not use template profiles
-- a profile name from template_profiles.json: use that template profile
-
-Allowed slide.layout values:
-- title_cover
-- title_summary
-- bullets
-- metric_dashboard
-- bar_comparison
-- line_trend
-- timeline
-- process_flow
-- comparison
-- risk_matrix
-- cause_effect
-- architecture_map
-- callout_focus
-- takeaway
-
-Supported component types:
-- metric_card
-- bar_chart
-- line_chart
-- timeline
-- process_flow
-- comparison
-- risk_matrix
-- cause_effect
-- architecture_map
-- callout
-
-DeckSpec JSON schema:
-{
-  "deck_title": "string",
-  "subtitle": "string",
-  "design": {
-    "theme": "auto | policy_brief | executive_summary | data_report | canva_modern_pitch | canva_warm_editorial | canva_fresh_startup | crisis_brief | tech_architecture | strategy_board | weather_risk",
-    "template": "auto_random | none | template profile name",
-    "tone": "string",
-    "density": "low | medium | high",
-    "visual_style": "string"
-  },
-  "slides": [
-    {
-      "layout": "title_cover | title_summary | bullets | metric_dashboard | bar_comparison | line_trend | timeline | process_flow | comparison | risk_matrix | cause_effect | architecture_map | callout_focus | takeaway",
-      "kicker": "string",
-      "title": "string",
-      "bullets": ["string"],
-      "components": [
-        {
-          "type": "metric_card",
-          "label": "string",
-          "value": "string",
-          "delta": "string",
-          "context": "string",
-          "emphasis": "primary | accent | warning"
-        },
-        {
-          "type": "bar_chart",
-          "title": "string",
-          "unit": "string",
-          "data": [
-            { "label": "string", "value": 0 }
-          ],
-          "emphasis": "primary | accent | warning"
-        },
-        {
-          "type": "line_chart | timeline | process_flow | comparison | risk_matrix | cause_effect | architecture_map | callout",
-          "data": [],
-          "items": [],
-          "events": [],
-          "steps": [],
-          "nodes": [],
-          "edges": []
-        }
-      ],
-      "speaker_note": "string"
-    }
-  ]
-}
-
-Layout guidance:
-- Put a title_cover slide as the first item in slides when the deck needs a cover.
-- Use title_summary for the first content slide after the cover.
-- Use metric_dashboard when the source has 2-3 important numbers.
-- Use bar_comparison when two or more numeric values should be compared.
-- Use line_trend for time-series, repeated incidents, or year-by-year values.
-- Use timeline for chronological event handling.
-- Use process_flow for operational or investigation steps.
-- Use comparison for two-sided decisions, before/after, or immediate/structural split.
-- Use risk_matrix for likelihood-impact prioritization.
-- Use cause_effect for root-cause framing.
-- Use architecture_map for AI systems, harnesses, agents, tools, memory, or model routing.
-- Use callout_focus when a single conclusion should dominate the slide.
-- Use bullets for compact explanation when no visual pattern fits.
-- Use takeaway for the final conclusion.
-
-Source text:
-<<<
-PASTE_SOURCE_TEXT_HERE
->>>
+```bash
+python3 make_ppt.py test/your_file.json -o results/your_file.pptx
 ```
+
+이 프롬프트는 실제 값이 들어간 강한 예시 대신 placeholder 예시를 사용합니다. 따라서 예시 숫자나 라벨이 결과 JSON으로 새어 들어갈 위험을 줄이고, 원문 안의 숫자·날짜·비교·원인·위험 증거를 먼저 추출하도록 유도합니다.
 
 ## Theme Selection Guide
 

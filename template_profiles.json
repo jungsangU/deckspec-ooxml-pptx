@@ -11,11 +11,27 @@
       "line": "BFCDE8",
       "motif": "data_blocks",
       "bullet_style": "data_rows",
+      "template_style": "blue_ribbon_business",
+      "frame_color": "123374",
+      "title_fill": "FFFFFF",
+      "progress_fill": "B2D9EA",
       "layout_variants": {
-        "title_cover": "left_panel",
-        "metric_dashboard": "strip_cards",
-        "bar_comparison": "horizontal_bars",
-        "takeaway": "summary_panel"
+        "title_cover": {
+          "default": "blue_ribbon_title",
+          "candidates": ["blue_ribbon_title", "centered_badge", "diagonal_hero"]
+        },
+        "metric_dashboard": {
+          "default": "radial_bubbles",
+          "candidates": ["radial_bubbles", "scoreboard", "vertical_stack"]
+        },
+        "bar_comparison": {
+          "default": "blue_progress_rows",
+          "candidates": ["blue_progress_rows", "lollipop", "vertical_columns"]
+        },
+        "takeaway": {
+          "default": "ribbon_summary",
+          "candidates": ["ribbon_summary", "quote_band", "decision_memo"]
+        }
       },
       "palette": ["1B4DAC", "123374", "FF6600", "3F75E1", "023141"]
     },
@@ -30,10 +46,22 @@
       "motif": "editorial_frame",
       "bullet_style": "editorial",
       "layout_variants": {
-        "title_cover": "editorial_split",
-        "metric_dashboard": "vertical_stack",
-        "bar_comparison": "lollipop",
-        "takeaway": "quote_band"
+        "title_cover": {
+          "default": "editorial_split",
+          "candidates": ["editorial_split", "left_panel", "centered_badge"]
+        },
+        "metric_dashboard": {
+          "default": "vertical_stack",
+          "candidates": ["vertical_stack", "compact_table", "strip_cards"]
+        },
+        "bar_comparison": {
+          "default": "lollipop",
+          "candidates": ["lollipop", "horizontal_bars", "split_panel"]
+        },
+        "takeaway": {
+          "default": "quote_band",
+          "candidates": ["quote_band", "summary_panel", "decision_memo"]
+        }
       },
       "palette": ["9BB7DD", "7B1B29", "FF6600", "FF0000", "C22F37"]
     },
@@ -48,10 +76,22 @@
       "motif": "diagonal_blocks",
       "bullet_style": "outline",
       "layout_variants": {
-        "title_cover": "diagonal_hero",
-        "metric_dashboard": "scoreboard",
-        "bar_comparison": "vertical_columns",
-        "takeaway": "full_bleed_callout"
+        "title_cover": {
+          "default": "diagonal_hero",
+          "candidates": ["diagonal_hero", "left_panel", "centered_badge"]
+        },
+        "metric_dashboard": {
+          "default": "scoreboard",
+          "candidates": ["scoreboard", "strip_cards", "staggered_cards"]
+        },
+        "bar_comparison": {
+          "default": "vertical_columns",
+          "candidates": ["vertical_columns", "horizontal_bars", "lollipop"]
+        },
+        "takeaway": {
+          "default": "full_bleed_callout",
+          "candidates": ["full_bleed_callout", "summary_panel", "decision_memo"]
+        }
       },
       "palette": ["FF6600", "FF0000", "00B0F0", "3366FF", "4472C4"]
     },
@@ -65,11 +105,28 @@
       "line": "BFDFDB",
       "motif": "soft_circles",
       "bullet_style": "cards",
+      "template_style": "mint_dotted_business",
+      "frame_color": "F27C70",
+      "dot_color": "FFFFFF",
+      "title_fill": "F8FFF8",
+      "progress_fill": "F6E87A",
       "layout_variants": {
-        "title_cover": "centered_badge",
-        "metric_dashboard": "staggered_cards",
-        "bar_comparison": "rounded_bars",
-        "takeaway": "soft_panel"
+        "title_cover": {
+          "default": "center_capsule_title",
+          "candidates": ["center_capsule_title", "centered_badge", "left_panel"]
+        },
+        "metric_dashboard": {
+          "default": "donut_metrics",
+          "candidates": ["donut_metrics", "staggered_cards", "strip_cards"]
+        },
+        "bar_comparison": {
+          "default": "progress_rows",
+          "candidates": ["progress_rows", "lollipop", "horizontal_bars"]
+        },
+        "takeaway": {
+          "default": "soft_panel",
+          "candidates": ["soft_panel", "quote_band", "summary_panel"]
+        }
       },
       "palette": ["198B80", "8CDCDD", "273353", "FFCCCC", "FF6600"]
     },
@@ -84,10 +141,22 @@
       "motif": "executive_frame",
       "bullet_style": "numbered",
       "layout_variants": {
-        "title_cover": "executive_memo",
-        "metric_dashboard": "compact_table",
-        "bar_comparison": "split_panel",
-        "takeaway": "decision_memo"
+        "title_cover": {
+          "default": "executive_memo",
+          "candidates": ["executive_memo", "diagonal_hero", "left_panel"]
+        },
+        "metric_dashboard": {
+          "default": "compact_table",
+          "candidates": ["compact_table", "vertical_stack", "scoreboard"]
+        },
+        "bar_comparison": {
+          "default": "split_panel",
+          "candidates": ["split_panel", "vertical_columns", "horizontal_bars"]
+        },
+        "takeaway": {
+          "default": "decision_memo",
+          "candidates": ["decision_memo", "summary_panel", "quote_band"]
+        }
       },
       "palette": ["239B82", "FF6600", "145849", "FCBC85", "FDCC9B"]
     },
@@ -102,10 +171,22 @@
       "motif": "weather_front",
       "bullet_style": "weather",
       "layout_variants": {
-        "title_cover": "weather_alert",
-        "metric_dashboard": "alert_cards",
-        "bar_comparison": "vertical_columns",
-        "takeaway": "forecast_brief"
+        "title_cover": {
+          "default": "weather_alert",
+          "candidates": ["weather_alert", "centered_badge", "diagonal_hero"]
+        },
+        "metric_dashboard": {
+          "default": "alert_cards",
+          "candidates": ["alert_cards", "scoreboard", "vertical_stack"]
+        },
+        "bar_comparison": {
+          "default": "vertical_columns",
+          "candidates": ["vertical_columns", "lollipop", "horizontal_bars"]
+        },
+        "takeaway": {
+          "default": "forecast_brief",
+          "candidates": ["forecast_brief", "quote_band", "summary_panel"]
+        }
       },
       "palette": ["ADB5C8", "6C53E3", "A089FF", "FF0000", "44546A"]
     }
