@@ -1,0 +1,109 @@
+{
+  "themes": [
+    {
+      "id": "claude_code_dark",
+      "name": "Claude Code Dark",
+      "category": ["AI", "Development", "SaaS"],
+      "colors": {
+        "background": "#0D1117",
+        "title": "#FFFFFF",
+        "text": "#C9D1D9",
+        "primary": "#58A6FF",
+        "secondary": "#30363D",
+        "accent": "#7EE787"
+      }
+    },
+    {
+      "id": "openai_clean",
+      "name": "OpenAI Clean",
+      "category": ["Product", "Corporate", "Investor"],
+      "colors": {
+        "background": "#F7F7F5",
+        "title": "#1A1A1A",
+        "text": "#4A4A4A",
+        "primary": "#10A37F",
+        "secondary": "#DFF6EF",
+        "accent": "#0F8C6A"
+      }
+    },
+    {
+      "id": "linear_premium",
+      "name": "Linear Premium",
+      "category": ["Startup", "SaaS", "Technology"],
+      "colors": {
+        "background": "#08090A",
+        "title": "#FFFFFF",
+        "text": "#A1A1AA",
+        "primary": "#5E6AD2",
+        "secondary": "#2E3035",
+        "accent": "#FFFFFF"
+      }
+    },
+    {
+      "id": "apple_minimal",
+      "name": "Apple Minimal",
+      "category": ["Product", "Hardware", "Consumer"],
+      "colors": {
+        "background": "#FFFFFF",
+        "title": "#1D1D1F",
+        "text": "#515154",
+        "primary": "#0071E3",
+        "secondary": "#F5F5F7",
+        "accent": "#86868B"
+      }
+    },
+    {
+      "id": "bloomberg_finance",
+      "name": "Bloomberg Finance",
+      "category": ["Finance", "Market", "Statistics"],
+      "colors": {
+        "background": "#000000",
+        "title": "#FFFFFF",
+        "text": "#D1D5DB",
+        "primary": "#FF6B00",
+        "secondary": "#FFD43B",
+        "accent": "#FFFFFF"
+      }
+    },
+    {
+      "id": "future_ai",
+      "name": "Future AI",
+      "category": ["AI", "Robotics", "FutureTech"],
+      "colors": {
+        "background": "#050816",
+        "title": "#FFFFFF",
+        "text": "#CBD5E1",
+        "primary": "#00E5FF",
+        "secondary": "#7C3AED",
+        "accent": "#FFFFFF"
+      }
+    },
+    {
+      "id": "government_report",
+      "name": "Government Report",
+      "category": ["Public", "Policy", "Statistics"],
+      "colors": {
+        "background": "#FFFFFF",
+        "title": "#003A70",
+        "text": "#4B5563",
+        "primary": "#0F62FE",
+        "secondary": "#D9E8F7",
+        "accent": "#003A70"
+      }
+    },
+    {
+      "id": "modern_ai_dark",
+      "name": "Modern AI Dark",
+      "category": ["AI", "Agent", "MCP", "Developer"],
+      "colors": {
+        "background": "#0B1020",
+        "title": "#FFFFFF",
+        "text": "#C9D1D9",
+        "primary": "#4F8CFF",
+        "secondary": "#7EE787",
+        "accent": "#F59E0B",
+        "card": "#161B2E"
+      }
+    }
+  ]
+}

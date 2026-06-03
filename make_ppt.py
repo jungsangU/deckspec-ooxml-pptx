@@ -12,11 +12,12 @@ from pathlib import Path
 DEFAULT_OUTPUT = "deck_from_deckspec_ooxml.pptx"
 BASE_OOXML_DIR = Path(__file__).with_name("base_ooxml")
 TEMPLATE_PROFILES_PATH = Path(__file__).with_name("template_profiles.json")
+COLOR_THEMES_PATH = Path(__file__).with_name("color.json")
 
 EMU_PER_INCH = 914400
 SLIDE_W = 12192000
 SLIDE_H = 6858000
-MIN_READABLE_FONT = 950
+MIN_READABLE_FONT = 1100
 
 
 def installed_typeface(candidates):
@@ -46,12 +47,12 @@ TYPEFACE_LATIN = installed_typeface(["Pretendard", "SUIT", "Aptos", "Arial"])
 TYPEFACE_COMPLEX = TYPEFACE_LATIN
 
 FONT = {
-    "micro": 950,
-    "caption": 1050,
-    "label": 1200,
-    "body_small": 1300,
-    "body": 1450,
-    "body_large": 1650,
+    "micro": 1100,
+    "caption": 1200,
+    "label": 1350,
+    "body_small": 1500,
+    "body": 1650,
+    "body_large": 1850,
     "section": 1900,
     "display": 2800,
     "hero": 3400,
@@ -315,6 +316,98 @@ def load_template_profiles():
     return [profile for profile in profiles if isinstance(profile, dict)]
 
 
+def clean_hex(value, default):
+    text = safe_text(value).strip().lstrip("#")
+    if re.fullmatch(r"[0-9A-Fa-f]{6}", text):
+        return text.upper()
+    return default
+
+
+def load_color_themes():
+    if not COLOR_THEMES_PATH.exists():
+        return []
+    try:
+        data = json.loads(COLOR_THEMES_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    themes = data.get("themes", []) if isinstance(data, dict) else []
+    return [theme for theme in themes if isinstance(theme, dict)]
+
+
+def color_theme_score(color_theme, deckspec):
+    categories = " ".join(safe_text(c) for c in color_theme.get("category", []))
+    haystack = f"{safe_text(color_theme.get('id'))} {safe_text(color_theme.get('name'))} {categories}".lower()
+    text = deck_text(deckspec)
+    score = 0
+    for term in re.findall(r"[a-zA-Z가-힣0-9]+", text):
+        if len(term) >= 2 and term.lower() in haystack:
+            score += 1
+    return score
+
+
+def select_color_theme(deckspec):
+    color_themes = load_color_themes()
+    if not color_themes:
+        return None
+    design = deckspec.get("design", {}) if isinstance(deckspec, dict) else {}
+    request = safe_text(
+        design.get("color_theme")
+        or design.get("palette")
+        or design.get("color")
+        or ""
+    ).strip()
+    theme_name = safe_text(design.get("theme", "")).strip()
+    if not request and theme_name in {safe_text(t.get("id")) for t in color_themes}:
+        request = theme_name
+    if request in {"none", "off", "false"}:
+        return None
+    if request in {"auto", "content_aware", "content-aware"}:
+        return max(color_themes, key=lambda item: color_theme_score(item, deckspec))
+    if request in {"random", "auto_random"}:
+        return random.choice(color_themes)
+    if not request:
+        return None
+    request_lower = request.lower()
+    for color_theme in color_themes:
+        if request_lower in {
+            safe_text(color_theme.get("id")).lower(),
+            safe_text(color_theme.get("name")).lower(),
+        }:
+            return color_theme
+    return None
+
+
+def apply_color_theme(theme, deckspec):
+    color_theme = select_color_theme(deckspec)
+    if not color_theme:
+        return theme
+    colors = color_theme.get("colors", {}) if isinstance(color_theme.get("colors"), dict) else {}
+    background = clean_hex(colors.get("background"), theme["background"])
+    surface = clean_hex(colors.get("card") or colors.get("secondary"), theme["surface"])
+    title = clean_hex(colors.get("title"), theme["text"])
+    text = clean_hex(colors.get("text"), theme["muted"])
+    primary = clean_hex(colors.get("primary"), theme["primary"])
+    accent = clean_hex(colors.get("accent"), theme["accent"])
+    secondary = clean_hex(colors.get("secondary"), theme["surface_alt"])
+    theme.update(
+        {
+            "background": background,
+            "surface": surface,
+            "surface_alt": secondary,
+            "text": title,
+            "muted": text,
+            "line": secondary,
+            "primary": primary,
+            "accent": accent,
+            "warning": accent,
+        }
+    )
+    design = deckspec.get("design", {}) if isinstance(deckspec, dict) else {}
+    design["selected_color_theme"] = color_theme.get("id") or color_theme.get("name")
+    deckspec["design"] = design
+    return theme
+
+
 def select_template_profile(deckspec):
     profiles = load_template_profiles()
     if not profiles:
@@ -399,6 +492,7 @@ def theme_for(deckspec):
         theme.update({k: v for k, v in profile.items() if k in style_keys})
         design["selected_template"] = profile["name"]
         deckspec["design"] = design
+    theme = apply_color_theme(theme, deckspec)
     return theme
 
 
@@ -754,7 +848,7 @@ def list_font(items, width_in, base=FONT["body_small"], minimum=FONT["caption"])
 
 
 def compact_text_limit(width_in, font_size):
-    return max(14, int(width_in * (13000 / max(font_size, 1))))
+    return max(18, int(width_in * (15000 / max(font_size, 1))))
 
 
 def content_density(items):
@@ -767,7 +861,7 @@ def content_density(items):
     return "low"
 
 
-def grid_slots(count, x, y, w, h, gap=0.24, prefer_columns=None):
+def grid_slots(count, x, y, w, h, gap=0.32, prefer_columns=None):
     count = max(1, count)
     if prefer_columns:
         cols = min(prefer_columns, count)
@@ -1093,19 +1187,6 @@ def add_header(shapes, slide, theme, shape_id):
 
 
 def add_note_and_page(shapes, slide, theme, index, shape_id):
-    note = slide.get("speaker_note") or slide.get("note") or ""
-    shapes.append(
-        text_box_xml(
-            shape_id,
-            "Speaker Note",
-            emu(0.8),
-            emu(6.45),
-            emu(10.8),
-            emu(0.35),
-            [paragraph_xml(clamp_text(note, 120), 1000, theme["muted"])],
-        )
-    )
-    shape_id += 1
     shapes.append(
         text_box_xml(
             shape_id,
@@ -1125,13 +1206,13 @@ def render_bullets(
     slide,
     theme,
     shape_id,
-    start_y=1.95,
+    start_y=2.05,
     max_items=None,
-    bottom_y=6.15,
-    box_h=0.62,
-    step=0.78,
-    font_size=1800,
-    text_limit=80,
+    bottom_y=6.25,
+    box_h=0.72,
+    step=0.88,
+    font_size=1700,
+    text_limit=96,
 ):
     bullets = [safe_text(b) for b in slide.get("bullets", []) if safe_text(b)]
     if not bullets:
@@ -1143,7 +1224,7 @@ def render_bullets(
         for idx, (bullet, (x, y, w, h)) in enumerate(zip(bullets, slots)):
             accent = theme["primary"] if idx % 2 == 0 else theme["accent"]
             font = fit_font(bullet, w - 0.65, base=FONT["body_large"], minimum=FONT["body_small"], maximum=FONT["section"])
-            tile_h = max(0.82, min(h, 1.38 if variant == "tile_grid" else 1.08))
+            tile_h = max(1.0, min(h, 1.5 if variant == "tile_grid" else 1.22))
             shapes.append(text_box_xml(shape_id, "Bullet Tile", emu(x), emu(y), emu(w), emu(tile_h), [], fill=theme["surface"], line=theme["line"], radius=True))
             shape_id += 1
             if variant == "spotlight_list":
@@ -1154,7 +1235,7 @@ def render_bullets(
                 shapes.append(shape_xml(shape_id, "Bullet Tile Accent", emu(x), emu(y), emu(0.08), emu(tile_h), accent, accent))
                 shape_id += 1
                 text_x, text_w = x + 0.3, w - 0.5
-            shapes.append(text_box_xml(shape_id, "Bullet Tile Text", emu(text_x), emu(y + 0.15), emu(text_w), emu(max(0.35, tile_h - 0.25)), [paragraph_xml(clamp_text(bullet, compact_text_limit(text_w, font)), font, theme["text"], True)]))
+            shapes.append(text_box_xml(shape_id, "Bullet Tile Text", emu(text_x), emu(y + 0.18), emu(text_w), emu(max(0.5, tile_h - 0.28)), [paragraph_xml(clamp_text(bullet, compact_text_limit(text_w, font)), font, theme["text"], True)]))
             shape_id += 1
         return shape_id
 
@@ -1190,7 +1271,7 @@ def render_bullets(
                 )
             )
             shape_id += 1
-            shapes.append(shape_xml(shape_id, "Bullet Number", emu(0.94), emu(y + 0.12), emu(0.34), emu(0.34), theme["primary"], theme["primary"], "rect"))
+            shapes.append(shape_xml(shape_id, "Bullet Number", emu(0.94), emu(y + 0.16), emu(0.36), emu(0.36), theme["primary"], theme["primary"], "rect"))
             shape_id += 1
             text_x, text_w, prefix = 1.42, 10.65, f"{idx + 1}. "
         elif bullet_style in ("alert", "weather"):
@@ -1240,9 +1321,9 @@ def render_bullets(
                 shape_id,
                 "Bullet",
                 emu(text_x),
-                emu(y + 0.08),
+                emu(y + 0.12),
                 emu(text_w),
-                emu(max(0.32, box_h - 0.18)),
+                emu(max(0.42, box_h - 0.18)),
                 [paragraph_xml(prefix + clamp_text(bullet, text_limit), font_size, theme["text"])],
             )
         )
@@ -1863,29 +1944,32 @@ def render_timeline(shapes, slide, theme, shape_id):
 
 def render_process_flow(shapes, slide, theme, shape_id):
     flows = [c for c in slide.get("components", []) if c.get("type") == "process_flow"]
-    steps = (flows[0].get("steps", []) if flows else [])[:4]
+    steps = (flows[0].get("steps", []) if flows else [])[:6]
     if not steps:
         steps = [{"label": b, "detail": ""} for b in slide.get("bullets", [])[:4]]
     if not steps:
         return render_bullets(shapes, slide, theme, shape_id)
 
-    slots = grid_slots(len(steps), 0.85, 2.02, 11.65, 3.3, gap=0.28, prefer_columns=min(len(steps), 4))
+    cols = 3 if len(steps) >= 5 else min(len(steps), 3)
+    slots = grid_slots(len(steps), 0.9, 2.0, 11.55, 3.85, gap=0.38, prefer_columns=cols)
     for idx, step in enumerate(steps):
         sx, y, w, h = slots[idx]
         accent = theme["primary"] if idx % 2 == 0 else theme["accent"]
-        text_font = list_font([step.get("label", ""), step.get("detail", "")], w - 0.45, base=FONT["body_small"], minimum=FONT["caption"])
+        card_h = min(h, 1.45)
+        card_y = y + max(0, (h - card_h) / 2)
+        text_font = list_font([step.get("label", ""), step.get("detail", "")], w - 0.65, base=FONT["body_small"], minimum=FONT["caption"])
         shapes.append(
             text_box_xml(
                 shape_id,
                 "Process Step",
                 emu(sx),
-                emu(y),
+                emu(card_y),
                 emu(w),
-                emu(h),
+                emu(card_h),
                 [
-                    paragraph_xml(f"{idx + 1:02d}", 950, accent, True),
-                    paragraph_xml(clamp_text(step.get("label", ""), compact_text_limit(w - 0.45, text_font)), text_font, theme["text"], True),
-                    paragraph_xml(clamp_text(step.get("detail", ""), compact_text_limit(w - 0.45, FONT["micro"])), FONT["micro"], theme["muted"]),
+                    paragraph_xml(f"{idx + 1:02d}", FONT["micro"], accent, True),
+                    paragraph_xml(clamp_text(step.get("label", ""), compact_text_limit(w - 0.65, text_font)), text_font, theme["text"], True),
+                    paragraph_xml(clamp_text(step.get("detail", ""), compact_text_limit(w - 0.65, FONT["caption"])), FONT["caption"], theme["muted"]),
                 ],
                 fill=theme["surface"],
                 line=theme["line"],
@@ -1895,12 +1979,12 @@ def render_process_flow(shapes, slide, theme, shape_id):
         shape_id += 1
         if idx < len(steps) - 1:
             next_x, next_y, _, _ = slots[idx + 1]
-            if abs(next_y - y) < 0.1:
-                shapes.append(shape_xml(shape_id, "Flow Arrow", emu(sx + w + 0.08), emu(y + h / 2 - 0.14), emu(0.28), emu(0.28), accent, accent, "triangle"))
+            if abs(next_y - y) < 0.1 and (idx + 1) % cols != 0:
+                shapes.append(shape_xml(shape_id, "Flow Arrow", emu(sx + w + 0.11), emu(card_y + card_h / 2 - 0.12), emu(0.24), emu(0.24), accent, accent, "triangle"))
             else:
-                shapes.append(line_segment_xml(shape_id, "Flow Down Connector", emu(sx + w / 2), emu(y + h), emu(next_x + w / 2), emu(next_y), accent, 9525, "dash"))
+                shapes.append(line_segment_xml(shape_id, "Flow Down Connector", emu(sx + w / 2), emu(card_y + card_h), emu(next_x + w / 2), emu(next_y), accent, 9525, "dash"))
             shape_id += 1
-    return render_bullets(shapes, slide, theme, shape_id, start_y=4.18, max_items=2, box_h=0.52, step=0.62, font_size=1250, text_limit=62)
+    return render_bullets(shapes, slide, theme, shape_id, start_y=5.85, max_items=1, bottom_y=6.25, box_h=0.42, step=0.48, font_size=FONT["caption"], text_limit=70)
 
 
 def render_comparison(shapes, slide, theme, shape_id):
@@ -2159,33 +2243,33 @@ def render_architecture_map(shapes, slide, theme, shape_id):
             {"id": "tools", "label": "Tools"},
         ]
         edges = [{"from": "user", "to": "harness"}, {"from": "harness", "to": "model"}, {"from": "harness", "to": "tools"}]
-    slots = grid_slots(len(nodes), 0.95, 2.0, 11.45, 3.75, gap=0.42, prefer_columns=4 if len(nodes) > 4 else len(nodes))
-    positions = {
-        "user": (0.95, 3.05),
-        "harness": (3.75, 3.05),
-        "model": (6.55, 2.2),
-        "tools": (6.55, 3.8),
-        "memory": (9.35, 2.2),
-        "skills": (9.35, 3.8),
-        "a2a": (9.35, 5.05),
-    }
+    columns = 3 if len(nodes) > 4 else min(len(nodes), 4)
+    slots = grid_slots(len(nodes), 0.9, 1.95, 11.55, 4.15, gap=0.38, prefer_columns=columns)
     node_pos = {}
+    node_box = {}
     for idx, node in enumerate(nodes):
         node_id = safe_text(node.get("id", f"n{idx}"))
-        node_pos[node_id] = positions.get(node_id, (slots[idx][0], slots[idx][1]))
+        sx, sy, sw, sh = slots[idx]
+        card_h = min(sh, 1.12 if len(nodes) > 4 else 1.35)
+        card_y = sy + max(0, (sh - card_h) / 2)
+        node_box[node_id] = (sx, card_y, sw, card_h)
+        node_pos[node_id] = (sx + sw / 2, card_y + card_h / 2)
     for edge in edges:
         a, b = node_pos.get(edge.get("from")), node_pos.get(edge.get("to"))
         if a and b:
-            shapes.append(line_segment_xml(shape_id, "Architecture Edge", emu(a[0] + 0.7), emu(a[1] + 0.25), emu(b[0]), emu(b[1] + 0.25), theme["line"], 12700))
+            shapes.append(line_segment_xml(shape_id, "Architecture Edge", emu(a[0]), emu(a[1]), emu(b[0]), emu(b[1]), theme["line"], 12700))
             shape_id += 1
     for idx, node in enumerate(nodes):
         node_id = safe_text(node.get("id", f"n{idx}"))
-        x, y = node_pos[node_id]
+        x, y, width, height = node_box[node_id]
         accent = theme_color(theme, node.get("emphasis", "primary" if idx == 1 else "accent"))
         label = safe_text(node.get("label", node_id))
-        width = 1.75 if len(nodes) <= 5 else 1.55
-        font = fit_font(label, width - 0.25, base=FONT["caption"], minimum=FONT["micro"], maximum=FONT["body_small"])
-        shapes.append(text_box_xml(shape_id, "Architecture Node", emu(x), emu(y), emu(width), emu(0.72), [paragraph_xml(clamp_text(label, compact_text_limit(width - 0.25, font)), font, theme["text"], True, "center")], fill=theme["surface"], line=accent, radius=True, anchor="ctr", margin_y=0))
+        detail = safe_text(node.get("detail", ""))
+        font = fit_font(label, width - 0.55, base=FONT["body_small"], minimum=FONT["caption"], maximum=FONT["body"])
+        paragraphs = [paragraph_xml(clamp_text(label, compact_text_limit(width - 0.55, font)), font, theme["text"], True, "center")]
+        if detail:
+            paragraphs.append(paragraph_xml(clamp_text(detail, compact_text_limit(width - 0.55, FONT["caption"])), FONT["caption"], theme["muted"], False, "center"))
+        shapes.append(text_box_xml(shape_id, "Architecture Node", emu(x), emu(y), emu(width), emu(height), paragraphs, fill=theme["surface"], line=accent, radius=True, anchor="ctr", margin_y=0))
         shape_id += 1
     return shape_id
 
