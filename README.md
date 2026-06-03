@@ -101,6 +101,49 @@ base_ooxml_corporate/
 
 현재 버전은 단일 안정 템플릿 `base_ooxml/`을 사용하고, 시각적 차이는 `design.theme`, `slide.layout`, `components`로 만듭니다.
 
+## Color Themes
+
+`color.json`은 별도의 색상 팔레트 후보 목록입니다. `design.color_theme`을 지정하면 `design.theme` 또는 `template_profiles.json`으로 정해진 구조 위에 색상 팔레트를 덮어씁니다.
+
+```json
+{
+  "design": {
+    "theme": "tech_architecture",
+    "color_theme": "modern_ai_dark"
+  }
+}
+```
+
+랜덤 색상 조합을 쓰고 싶으면 다음처럼 지정합니다.
+
+```json
+{
+  "design": {
+    "theme": "auto",
+    "template": "auto_random",
+    "color_theme": "random"
+  }
+}
+```
+
+지원 값:
+
+```text
+auto
+random
+auto_random
+claude_code_dark
+openai_clean
+linear_premium
+apple_minimal
+bloomberg_finance
+future_ai
+government_report
+modern_ai_dark
+```
+
+`auto`는 덱 내용과 `color.json`의 category를 비교해 가장 맞는 팔레트를 고릅니다. `random` 또는 `auto_random`은 실행할 때마다 `color.json` 안의 팔레트 중 하나를 고릅니다.
+
 ## Style Template Profiles
 
 `template_profiles.json`은 스타일 템플릿 후보 목록입니다.
@@ -264,6 +307,7 @@ qlmanage -t -s 1200 -o . output.pptx
   "story_reason": "Numbers and comparisons drive the message.",
   "design": {
     "theme": "policy_brief",
+    "color_theme": "auto",
     "template": "auto_random",
     "narrative_order": "auto",
     "tone": "calm_analytical",
@@ -322,7 +366,24 @@ risk_matrix
 cause_effect
 architecture_map
 callout_focus
+text_brief
 takeaway
+```
+
+`text_brief`는 도형과 카드 사용을 최소화한 텍스트 중심 레이아웃입니다. 짧은 리드 문장과 번호가 붙은 본문 항목을 균일한 행간으로 배치합니다. 설명형 장표, 원칙 정리, 체크리스트, 도형이 과한 장표를 대체할 때 사용합니다.
+
+```json
+{
+  "layout": "text_brief",
+  "kicker": "운영 원칙",
+  "title": "도형보다 텍스트 위계로 설명",
+  "lead": "핵심 메시지를 먼저 제시하고 본문은 균일한 행간과 번호 체계로 읽기 쉽게 배치한다.",
+  "bullets": [
+    "불필요한 카드와 장식 도형을 줄인다",
+    "번호와 얇은 구분선으로 정보 구조를 만든다",
+    "긴 문장은 2열로 나누어 가독성을 유지한다"
+  ]
+}
 ```
 
 ## Supported Components

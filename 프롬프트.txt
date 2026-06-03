@@ -86,6 +86,7 @@ Use this top-level structure:
   "story_reason": "string",
   "design": {
     "theme": "auto",
+    "color_theme": "auto | random | auto_random | color.json theme id",
     "template": "auto_random",
     "narrative_order": "auto",
     "tone": "calm_analytical",
@@ -97,6 +98,9 @@ Use this top-level structure:
 
 Design guidance:
 - Use "theme": "auto" unless a specific theme is clearly better.
+- Use "color_theme": "auto" when the deck topic has a clear style category.
+- Use "color_theme": "random" or "auto_random" when the user wants varied color palettes across runs.
+- You may choose a specific color_theme id from color.json when it fits the source, such as modern_ai_dark for AI/developer topics, openai_clean for clean product/corporate decks, government_report for policy/statistics, or bloomberg_finance for finance/market decks.
 - Use "template": "auto_random" unless the user asks for a specific template or no template.
 - Use "template": "none" only if the user asks not to use template profiles.
 - Use "narrative_order": "auto" unless the user explicitly wants to preserve the JSON slide order.
@@ -115,6 +119,19 @@ Allowed design.theme:
 - tech_architecture
 - strategy_board
 - weather_risk
+
+Allowed design.color_theme:
+- auto
+- random
+- auto_random
+- claude_code_dark
+- openai_clean
+- linear_premium
+- apple_minimal
+- bloomberg_finance
+- future_ai
+- government_report
+- modern_ai_dark
 
 Useful tone values:
 - calm_analytical
@@ -230,6 +247,12 @@ Choose slide.layout using this mapping:
   Use for one decisive message without enough data for a chart, or as a visual pause.
   Must include a callout component.
 
+- text_brief:
+  Use for clean text-first explanation, principles, checklists, concise briefings, or when visual cards/shapes would be too heavy.
+  Prefer this layout when the source has qualitative points that need hierarchy but not a chart, architecture map, process, comparison, or risk matrix.
+  Include a short lead, summary, or subtitle when possible, followed by 3 to 7 bullets.
+  Do not add component objects unless another stronger evidence layout is actually needed.
+
 - takeaway:
   Use for final conclusion, executive implication, recommendation, next decision, or policy outlook.
   May include bullets and/or a callout component.
@@ -250,6 +273,7 @@ Each slide should follow this style:
   "layout_reason": "short reason why this layout fits the evidence",
   "kicker": "short section label",
   "title": "short slide claim",
+  "lead": "optional one-sentence lead for text_brief",
   "subtitle": "optional",
   "bullets": ["short supporting points"],
   "components": [],
