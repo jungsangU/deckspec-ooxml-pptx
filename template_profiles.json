@@ -31,6 +31,30 @@
         "takeaway": {
           "default": "ribbon_summary",
           "candidates": ["ribbon_summary", "quote_band", "decision_memo"]
+        },
+        "line_trend": {
+          "default": "wide_plot_callout",
+          "candidates": ["wide_plot_callout", "milestone_line", "sparkline_stack"]
+        },
+        "cause_effect": {
+          "default": "cascade_cards",
+          "candidates": ["cascade_cards", "vertical_story", "split_swimlane"]
+        },
+        "risk_matrix": {
+          "default": "quadrant_watchlist",
+          "candidates": ["quadrant_watchlist", "ranked_watchlist", "heatmap_focus"]
+        },
+        "comparison": {
+          "default": "split_columns",
+          "candidates": ["split_columns", "stacked_scorecards", "before_after_cards"]
+        },
+        "bullets": {
+          "default": "compact_rows",
+          "candidates": ["compact_rows", "tile_grid", "spotlight_list"]
+        },
+        "title_summary": {
+          "default": "tile_grid",
+          "candidates": ["tile_grid", "compact_rows", "spotlight_list"]
         }
       },
       "palette": ["1B4DAC", "123374", "FF6600", "3F75E1", "023141"]
@@ -61,6 +85,30 @@
         "takeaway": {
           "default": "quote_band",
           "candidates": ["quote_band", "summary_panel", "decision_memo"]
+        },
+        "line_trend": {
+          "default": "milestone_line",
+          "candidates": ["milestone_line", "wide_plot_callout", "sparkline_stack"]
+        },
+        "cause_effect": {
+          "default": "vertical_story",
+          "candidates": ["vertical_story", "cascade_cards", "center_bridge"]
+        },
+        "risk_matrix": {
+          "default": "ranked_watchlist",
+          "candidates": ["ranked_watchlist", "heatmap_focus", "quadrant_watchlist"]
+        },
+        "comparison": {
+          "default": "stacked_scorecards",
+          "candidates": ["stacked_scorecards", "split_columns", "before_after_cards"]
+        },
+        "bullets": {
+          "default": "spotlight_list",
+          "candidates": ["spotlight_list", "compact_rows", "tile_grid"]
+        },
+        "title_summary": {
+          "default": "spotlight_list",
+          "candidates": ["spotlight_list", "tile_grid", "compact_rows"]
         }
       },
       "palette": ["9BB7DD", "7B1B29", "FF6600", "FF0000", "C22F37"]
@@ -91,6 +139,30 @@
         "takeaway": {
           "default": "full_bleed_callout",
           "candidates": ["full_bleed_callout", "summary_panel", "decision_memo"]
+        },
+        "line_trend": {
+          "default": "horizon_plot",
+          "candidates": ["horizon_plot", "wide_plot_callout", "milestone_line"]
+        },
+        "cause_effect": {
+          "default": "split_swimlane",
+          "candidates": ["split_swimlane", "cascade_cards", "vertical_story"]
+        },
+        "risk_matrix": {
+          "default": "heatmap_focus",
+          "candidates": ["heatmap_focus", "ranked_watchlist", "quadrant_watchlist"]
+        },
+        "comparison": {
+          "default": "before_after_cards",
+          "candidates": ["before_after_cards", "stacked_scorecards", "split_columns"]
+        },
+        "bullets": {
+          "default": "compact_rows",
+          "candidates": ["compact_rows", "tile_grid", "spotlight_list"]
+        },
+        "title_summary": {
+          "default": "tile_grid",
+          "candidates": ["tile_grid", "spotlight_list", "compact_rows"]
         }
       },
       "palette": ["FF6600", "FF0000", "00B0F0", "3366FF", "4472C4"]
@@ -126,6 +198,30 @@
         "takeaway": {
           "default": "soft_panel",
           "candidates": ["soft_panel", "quote_band", "summary_panel"]
+        },
+        "line_trend": {
+          "default": "sparkline_stack",
+          "candidates": ["sparkline_stack", "wide_plot_callout", "milestone_line"]
+        },
+        "cause_effect": {
+          "default": "center_bridge",
+          "candidates": ["center_bridge", "cascade_cards", "vertical_story"]
+        },
+        "risk_matrix": {
+          "default": "compact_quadrant",
+          "candidates": ["compact_quadrant", "heatmap_focus", "ranked_watchlist"]
+        },
+        "comparison": {
+          "default": "split_columns",
+          "candidates": ["split_columns", "before_after_cards", "stacked_scorecards"]
+        },
+        "bullets": {
+          "default": "tile_grid",
+          "candidates": ["tile_grid", "spotlight_list", "compact_rows"]
+        },
+        "title_summary": {
+          "default": "tile_grid",
+          "candidates": ["tile_grid", "spotlight_list", "compact_rows"]
         }
       },
       "palette": ["198B80", "8CDCDD", "273353", "FFCCCC", "FF6600"]
@@ -156,6 +252,30 @@
         "takeaway": {
           "default": "decision_memo",
           "candidates": ["decision_memo", "summary_panel", "quote_band"]
+        },
+        "line_trend": {
+          "default": "wide_plot_callout",
+          "candidates": ["wide_plot_callout", "sparkline_stack", "milestone_line"]
+        },
+        "cause_effect": {
+          "default": "vertical_story",
+          "candidates": ["vertical_story", "split_swimlane", "cascade_cards"]
+        },
+        "risk_matrix": {
+          "default": "ranked_watchlist",
+          "candidates": ["ranked_watchlist", "quadrant_watchlist", "heatmap_focus"]
+        },
+        "comparison": {
+          "default": "stacked_scorecards",
+          "candidates": ["stacked_scorecards", "before_after_cards", "split_columns"]
+        },
+        "bullets": {
+          "default": "compact_rows",
+          "candidates": ["compact_rows", "spotlight_list", "tile_grid"]
+        },
+        "title_summary": {
+          "default": "spotlight_list",
+          "candidates": ["spotlight_list", "compact_rows", "tile_grid"]
         }
       },
       "palette": ["239B82", "FF6600", "145849", "FCBC85", "FDCC9B"]
@@ -186,6 +306,30 @@
         "takeaway": {
           "default": "forecast_brief",
           "candidates": ["forecast_brief", "quote_band", "summary_panel"]
+        },
+        "line_trend": {
+          "default": "milestone_line",
+          "candidates": ["milestone_line", "wide_plot_callout", "sparkline_stack"]
+        },
+        "cause_effect": {
+          "default": "cascade_cards",
+          "candidates": ["cascade_cards", "split_swimlane", "vertical_story"]
+        },
+        "risk_matrix": {
+          "default": "heatmap_focus",
+          "candidates": ["heatmap_focus", "quadrant_watchlist", "ranked_watchlist"]
+        },
+        "comparison": {
+          "default": "before_after_cards",
+          "candidates": ["before_after_cards", "split_columns", "stacked_scorecards"]
+        },
+        "bullets": {
+          "default": "spotlight_list",
+          "candidates": ["spotlight_list", "tile_grid", "compact_rows"]
+        },
+        "title_summary": {
+          "default": "spotlight_list",
+          "candidates": ["spotlight_list", "tile_grid", "compact_rows"]
         }
       },
       "palette": ["ADB5C8", "6C53E3", "A089FF", "FF0000", "44546A"]

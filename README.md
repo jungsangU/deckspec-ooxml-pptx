@@ -4,7 +4,7 @@ DeckSpec JSON을 입력받아 PowerPoint 내부 언어인 OOXML 파일들을 직
 
 LLM은 발표 내용과 디자인 의도를 `DeckSpec JSON`으로 만들고, 이 스크립트는 JSON을 안정적인 OOXML/PPTX로 렌더링하는 역할을 합니다.
 
-현재 렌더러는 한국어 가독성을 위해 무료 폰트인 `Pretendard`를 우선 typeface로 지정합니다. 폰트 파일을 PPTX에 임베드하지는 않으므로, PowerPoint를 여는 환경에 Pretendard가 설치되어 있으면 적용되고 없으면 시스템 대체 폰트로 표시됩니다.
+현재 렌더러는 한국어 가독성을 위해 설치된 폰트를 감지해 `Pretendard`, `SUIT`, `Noto Sans KR`, `Apple SD Gothic Neo`, `Malgun Gothic` 순서로 동아시아 typeface를 선택합니다. 폰트 파일을 PPTX에 임베드하지는 않으므로, PowerPoint를 여는 환경에 설치된 폰트가 적용되고 없으면 시스템 대체 폰트로 표시됩니다.
 
 ## Files
 
@@ -131,6 +131,8 @@ template_profiles.json
 
 `layout_variants`는 같은 DeckSpec 레이아웃을 템플릿마다 다르게 그리도록 만듭니다. 예를 들어 `metric_dashboard`는 기본 카드형, 스코어보드형, 세로 테이블형, 스태거 카드형, 원형 버블형으로 달라질 수 있고, `bar_comparison`은 가로 막대, 세로 컬럼, lollipop 차트, 진행률 행으로 달라질 수 있습니다.
 
+현재 렌더러는 `line_trend`, `cause_effect`, `risk_matrix`, `comparison`, `bullets/title_summary`도 adaptive variant를 지원합니다. 같은 `cause_effect`라도 짧은 파급 구조는 가로 캐스케이드 카드로, 내용이 많은 경우는 세로 스토리 레일 또는 swimlane 구조로 바뀔 수 있습니다. `risk_matrix`도 항목 수와 텍스트 밀도에 따라 사분면+watchlist, heatmap focus, ranked watchlist 중 하나를 선택합니다.
+
 `layout_variants`는 문자열 하나 또는 후보 풀을 받을 수 있습니다. 후보 풀이 있으면 렌더러가 슬라이드 내용과 덱 안의 반복도를 보고 자동으로 하나를 고릅니다.
 
 ```json
@@ -153,7 +155,7 @@ template_profiles.json
 }
 ```
 
-권장 흐름은 `텍스트 입력 -> LLM이 slide별 layout/components 결정 -> renderer가 variant/배치/OOXML 생성 -> PPTX 저장`입니다. LLM JSON에는 `x`, `y`, `font_size`, `shape_position` 같은 저수준 배치값을 넣지 마세요.
+권장 흐름은 `텍스트 입력 -> LLM이 slide별 layout/components 결정 -> renderer가 variant/배치/OOXML 생성 -> PPTX 저장`입니다. LLM JSON에는 `x`, `y`, `font_size`, `shape_position` 같은 저수준 배치값을 넣지 마세요. 대신 `evidence_type`, `layout_reason`, 짧은 라벨, 정확한 수치, 적절한 component 구조를 넣어야 renderer가 더 좋은 variant를 고를 수 있습니다.
 
 LLM이 JSON을 만들 때는 먼저 `story_archetype`을 고르게 하는 것이 좋습니다. 이 값은 덱의 이야기 흐름을 정합니다. 예를 들어 숫자와 지표 중심이면 `data_brief`, 원인과 파급 경로가 중심이면 `cause_to_effect`, 미래 변수와 리스크가 중심이면 `risk_monitoring`, AI 하네스나 A2A 같은 시스템 구조 설명이면 `architecture_brief`가 적합합니다.
 
