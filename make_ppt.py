@@ -1090,7 +1090,8 @@ def add_role_header(shapes, slide, theme, shape_id):
     if layout == "takeaway":
         shapes.append(text_box_xml(shape_id, "Takeaway Small Label", emu(0.92), emu(0.72), emu(3.3), emu(0.32), [paragraph_xml(kicker, FONT["caption"], theme["primary"], True)]))
         shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Takeaway Big Claim", emu(0.9), emu(1.12), emu(8.8), emu(0.8), [paragraph_xml(title, FONT["display"], theme["text"], True)]))
+        title_font = fit_font(title, 8.8, base=FONT["section"], minimum=FONT["body_large"], maximum=2400)
+        shapes.append(text_box_xml(shape_id, "Takeaway Big Claim", emu(0.9), emu(1.1), emu(8.8), emu(0.62), [paragraph_xml(title, title_font, theme["text"], True)]))
         return shape_id + 1
     return None
 
@@ -1175,7 +1176,8 @@ def add_header(shapes, slide, theme, shape_id):
     if layout == "takeaway":
         shapes.append(text_box_xml(shape_id, "Takeaway Small Label", emu(0.92), emu(0.72), emu(3.3), emu(0.32), [paragraph_xml(kicker, FONT["caption"], theme["primary"], True)]))
         shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Takeaway Big Claim", emu(0.9), emu(1.12), emu(8.8), emu(0.8), [paragraph_xml(title, FONT["display"], theme["text"], True)]))
+        title_font = fit_font(title, 8.8, base=FONT["section"], minimum=FONT["body_large"], maximum=2400)
+        shapes.append(text_box_xml(shape_id, "Takeaway Big Claim", emu(0.9), emu(1.1), emu(8.8), emu(0.62), [paragraph_xml(title, title_font, theme["text"], True)]))
         return shape_id + 1
 
     shapes.append(text_box_xml(shape_id, "Kicker", emu(0.65), emu(0.34), emu(5.6), emu(0.35), [paragraph_xml(kicker, FONT["label"], theme["primary"], True)]))
@@ -2306,6 +2308,86 @@ def render_callout_focus(shapes, slide, theme, shape_id):
     return shape_id + 1
 
 
+def render_text_brief(shapes, slide, theme, shape_id):
+    bullets = [safe_text(b) for b in slide.get("bullets", []) if safe_text(b)]
+    lead = safe_text(slide.get("lead") or slide.get("summary") or slide.get("subtitle") or "")
+    if not lead and bullets:
+        lead = bullets[0]
+        bullets = bullets[1:]
+
+    if lead:
+        lead_font = fit_font(lead, 10.4, base=FONT["body_large"], minimum=FONT["body"], maximum=FONT["section"])
+        shapes.append(shape_xml(shape_id, "Text Brief Lead Rule", emu(0.9), emu(1.85), emu(0.08), emu(0.72), theme["primary"], theme["primary"], "rect"))
+        shape_id += 1
+        shapes.append(
+            text_box_xml(
+                shape_id,
+                "Text Brief Lead",
+                emu(1.18),
+                emu(1.78),
+                emu(10.8),
+                emu(0.86),
+                [paragraph_xml(clamp_text(lead, compact_text_limit(10.4, lead_font) * 2), lead_font, theme["text"], True)],
+                margin_x=0,
+                margin_y=0,
+            )
+        )
+        shape_id += 1
+
+    if not bullets:
+        return shape_id
+
+    dense = len(bullets) >= 5 or item_weight(bullets) > 150
+    cols = 2 if dense else 1
+    start_y = 2.92 if lead else 2.05
+    bottom_y = 6.18
+    column_gap = 0.68
+    col_w = (11.2 - column_gap) / 2 if cols == 2 else 10.85
+    rows = (len(bullets) + cols - 1) // cols
+    row_h = min(0.82, max(0.56, (bottom_y - start_y) / max(rows, 1)))
+    font = list_font(bullets, col_w - 0.72, base=FONT["body"], minimum=FONT["caption"])
+
+    for idx, bullet in enumerate(bullets[: rows * cols]):
+        col = idx // rows if cols == 2 else 0
+        row = idx % rows if cols == 2 else idx
+        x = 0.95 + col * (col_w + column_gap)
+        y = start_y + row * row_h
+        accent = theme["primary"] if idx % 2 == 0 else theme["accent"]
+        if row > 0:
+            shapes.append(line_xml(shape_id, emu(x), emu(y - 0.08), emu(col_w), theme["line"]))
+            shape_id += 1
+        shapes.append(
+            text_box_xml(
+                shape_id,
+                "Text Brief Number",
+                emu(x),
+                emu(y + 0.05),
+                emu(0.48),
+                emu(0.28),
+                [paragraph_xml(f"{idx + 1:02d}", FONT["caption"], accent, True, "center")],
+                anchor="ctr",
+                margin_x=0,
+                margin_y=0,
+            )
+        )
+        shape_id += 1
+        shapes.append(
+            text_box_xml(
+                shape_id,
+                "Text Brief Item",
+                emu(x + 0.68),
+                emu(y),
+                emu(col_w - 0.72),
+                emu(max(0.44, row_h - 0.05)),
+                [paragraph_xml(clamp_text(bullet, compact_text_limit(col_w - 0.72, font)), font, theme["text"])],
+                margin_x=0,
+                margin_y=0,
+            )
+        )
+        shape_id += 1
+    return shape_id
+
+
 def render_title_cover(shapes, slide, theme, shape_id):
     kicker = slide.get("kicker") or "Presentation"
     title = slide.get("title") or "Untitled Deck"
@@ -2482,14 +2564,23 @@ def render_takeaway(shapes, slide, theme, shape_id):
             shape_id,
             "Takeaway Panel",
             emu(0.85),
-            emu(1.95),
+            emu(2.18),
             emu(11.65),
-            emu(3.05),
-            [paragraph_xml("핵심 메시지", FONT["body_small"], theme["primary"], True)]
-            + [paragraph_xml("• " + clamp_text(b, compact_text_limit(10.5, list_font(bullets, 10.5, base=FONT["body_large"], minimum=FONT["body_small"]))), list_font(bullets, 10.5, base=FONT["body_large"], minimum=FONT["body_small"]), theme["text"]) for b in bullets],
+            emu(2.35),
+            [paragraph_xml("핵심 메시지", FONT["label"], theme["primary"], True)]
+            + [
+                paragraph_xml(
+                    "• " + clamp_text(b, compact_text_limit(10.5, list_font(bullets, 10.5, base=FONT["body"], minimum=FONT["body_small"]))),
+                    list_font(bullets, 10.5, base=FONT["body"], minimum=FONT["body_small"]),
+                    theme["text"],
+                )
+                for b in bullets
+            ],
             fill=theme["surface_alt"],
             line=theme["line"],
             radius=True,
+            margin_x=182880,
+            margin_y=137160,
         )
     )
     return shape_id + 1
@@ -2519,6 +2610,8 @@ def render_slide_body(shapes, slide, theme, shape_id):
         return render_architecture_map(shapes, slide, theme, shape_id)
     if layout == "callout_focus":
         return render_callout_focus(shapes, slide, theme, shape_id)
+    if layout == "text_brief":
+        return render_text_brief(shapes, slide, theme, shape_id)
     if layout == "takeaway":
         return render_takeaway(shapes, slide, theme, shape_id)
     return render_bullets(shapes, slide, theme, shape_id)
@@ -2810,6 +2903,10 @@ def choose_visual_treatment(slide):
 
 
 def preflight_slide(slide):
+    if slide.get("layout") in {"text_brief"}:
+        slide.setdefault("variant", "auto")
+        slide.setdefault("visual_treatment", "text_first")
+        return slide
     inferred_layout = infer_layout_from_evidence(slide)
     if slide.get("layout") in {"bullets", "title_summary"} and inferred_layout not in {"bullets", "title_summary"}:
         slide["layout"] = inferred_layout
@@ -2867,6 +2964,7 @@ def narrative_rank(story_archetype, slide, original_index):
             "cause_effect": 50,
             "risk_matrix": 60,
             "title_summary": 70,
+            "text_brief": 75,
             "callout_focus": 80,
             "process_flow": 90,
             "timeline": 95,
@@ -2882,6 +2980,7 @@ def narrative_rank(story_archetype, slide, original_index):
             "risk_matrix": 50,
             "timeline": 60,
             "title_summary": 70,
+            "text_brief": 75,
             "callout_focus": 80,
             "process_flow": 90,
             "architecture_map": 100,
@@ -2896,6 +2995,7 @@ def narrative_rank(story_archetype, slide, original_index):
             "comparison": 60,
             "timeline": 70,
             "title_summary": 80,
+            "text_brief": 85,
             "callout_focus": 90,
             "process_flow": 100,
             "architecture_map": 110,
@@ -2910,6 +3010,7 @@ def narrative_rank(story_archetype, slide, original_index):
             "process_flow": 50,
             "cause_effect": 60,
             "title_summary": 70,
+            "text_brief": 75,
             "callout_focus": 80,
             "timeline": 90,
             "architecture_map": 100,
@@ -2917,6 +3018,7 @@ def narrative_rank(story_archetype, slide, original_index):
         },
         "explainer": {
             "title_summary": 10,
+            "text_brief": 15,
             "cause_effect": 20,
             "process_flow": 30,
             "architecture_map": 35,
@@ -2938,6 +3040,7 @@ def narrative_rank(story_archetype, slide, original_index):
             "comparison": 60,
             "risk_matrix": 70,
             "title_summary": 80,
+            "text_brief": 85,
             "callout_focus": 90,
             "process_flow": 100,
             "architecture_map": 110,
@@ -2953,6 +3056,7 @@ def narrative_rank(story_archetype, slide, original_index):
             "bar_comparison": 70,
             "line_trend": 75,
             "title_summary": 80,
+            "text_brief": 85,
             "callout_focus": 90,
             "timeline": 100,
             "bullets": 110,
