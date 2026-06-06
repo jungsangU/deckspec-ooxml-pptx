@@ -69,6 +69,119 @@ CONTENT = {
     "row_step": 0.94,
 }
 
+LAYOUT_VARIANT_POOL = {
+    "title_cover": {
+        "default": "left_panel",
+        "candidates": [
+            "left_panel",
+            "diagonal_hero",
+            "executive_memo",
+            "blue_ribbon_title",
+            "center_capsule_title",
+            "centered_badge",
+            "weather_alert",
+        ],
+    },
+    "metric_dashboard": {
+        "default": "strip_cards",
+        "candidates": [
+            "strip_cards",
+            "staggered_cards",
+            "scoreboard",
+            "alert_cards",
+            "vertical_stack",
+            "compact_table",
+            "radial_bubbles",
+            "donut_metrics",
+        ],
+        "rules": {
+            "many_metrics": "radial_bubbles",
+            "few_big_numbers": "scoreboard",
+        },
+    },
+    "bar_comparison": {
+        "default": "horizontal_bars",
+        "candidates": [
+            "horizontal_bars",
+            "vertical_columns",
+            "split_panel",
+            "lollipop",
+            "progress_rows",
+            "blue_progress_rows",
+        ],
+        "rules": {
+            "many_bars": "vertical_columns",
+        },
+    },
+    "line_trend": {
+        "default": "wide_plot_callout",
+        "candidates": [
+            "wide_plot_callout",
+            "horizon_plot",
+            "milestone_line",
+            "compact_trend",
+            "sparkline_stack",
+            "small_multiples",
+        ],
+    },
+    "cause_effect": {
+        "default": "cascade_cards",
+        "candidates": [
+            "cascade_cards",
+            "center_bridge",
+            "vertical_story",
+            "split_swimlane",
+        ],
+    },
+    "risk_matrix": {
+        "default": "ranked_watchlist",
+        "candidates": [
+            "ranked_watchlist",
+        ],
+    },
+    "comparison": {
+        "default": "split_columns",
+        "candidates": [
+            "split_columns",
+            "before_after_cards",
+            "dense_columns",
+        ],
+    },
+    "bullets": {
+        "default": "compact_rows",
+        "candidates": [
+            "compact_rows",
+            "sectioned_rows",
+            "tile_grid",
+            "spotlight_list",
+        ],
+    },
+    "title_summary": {
+        "default": "compact_rows",
+        "candidates": [
+            "compact_rows",
+            "sectioned_rows",
+            "tile_grid",
+            "spotlight_list",
+        ],
+    },
+    "takeaway": {
+        "default": "decision_memo",
+        "candidates": [
+            "decision_memo",
+            "ribbon_summary",
+            "quote_band",
+            "forecast_brief",
+            "full_bleed_callout",
+        ],
+    },
+}
+
+VARIANT_ALIASES = {
+    ("title_cover", "editorial_split"): "left_panel",
+    ("takeaway", "soft_panel"): "decision_memo",
+}
+
 THEMES = {
     "policy_brief": {
         "background": "FFFFFF",
@@ -482,7 +595,6 @@ def theme_for(deckspec):
             "line",
             "motif",
             "bullet_style",
-            "layout_variants",
             "template_style",
             "frame_color",
             "dot_color",
@@ -515,9 +627,33 @@ def candidate_variants(entry, default):
     return default, [default], {}
 
 
-def slide_variant_hint(slide, candidates):
+def normalize_variant(layout, variant):
+    variant = safe_text(variant)
+    return VARIANT_ALIASES.get((layout, variant), variant)
+
+
+def global_layout_variants():
+    pool = {}
+    for layout, entry in LAYOUT_VARIANT_POOL.items():
+        default_variant, candidates, rules = candidate_variants(entry, entry.get("default", "default"))
+        normalized = []
+        for candidate in candidates:
+            candidate = normalize_variant(layout, candidate)
+            if candidate and candidate not in normalized:
+                normalized.append(candidate)
+        pool[layout] = {
+            "default": normalize_variant(layout, default_variant) or (normalized[0] if normalized else "default"),
+            "candidates": normalized or ["default"],
+            "rules": dict(rules) if isinstance(rules, dict) else {},
+        }
+
+    return pool
+
+
+def slide_variant_hint(slide, candidates, layout=None):
     requested = safe_text(slide.get("variant") or slide.get("preferred_variant"))
     if requested and requested not in {"auto", "content_aware", "content-aware"}:
+        requested = normalize_variant(layout or safe_text(slide.get("layout", "")), requested)
         return requested if requested in candidates else None
     return None
 
@@ -556,7 +692,7 @@ def content_variant_scores(layout, slide, candidates, rules):
                 scores[candidate] = scores.get(candidate, 0) + 2
     elif layout == "takeaway":
         if len(bullets) >= 3:
-            for candidate in ["ribbon_summary", "decision_memo", "summary_panel"]:
+            for candidate in ["ribbon_summary", "decision_memo"]:
                 scores[candidate] = scores.get(candidate, 0) + 3
         else:
             for candidate in ["quote_band", "forecast_brief", "full_bleed_callout"]:
@@ -587,17 +723,17 @@ def content_variant_scores(layout, slide, candidates, rules):
         matrix = next((c for c in components if c.get("type") == "risk_matrix"), {})
         item_count = len(matrix.get("items", []))
         if item_count >= 6:
-            for candidate in ["ranked_watchlist", "compact_quadrant"]:
+            for candidate in ["ranked_watchlist"]:
                 scores[candidate] = scores.get(candidate, 0) + 5
         else:
-            for candidate in ["quadrant_watchlist", "heatmap_focus"]:
+            for candidate in ["ranked_watchlist"]:
                 scores[candidate] = scores.get(candidate, 0) + 4
     elif layout == "comparison":
         comp = next((c for c in components if c.get("type") == "comparison"), {})
         left_count = len(comp.get("left", {}).get("items", []))
         right_count = len(comp.get("right", {}).get("items", []))
         if max(left_count, right_count) >= 4:
-            for candidate in ["stacked_scorecards", "dense_columns"]:
+            for candidate in ["dense_columns", "split_columns"]:
                 scores[candidate] = scores.get(candidate, 0) + 4
         else:
             for candidate in ["split_columns", "before_after_cards"]:
@@ -627,12 +763,14 @@ def content_variant_scores(layout, slide, candidates, rules):
 
 
 def layout_variant(theme, layout, default="default", slide=None):
-    variants = theme.get("layout_variants", {})
+    variants = global_layout_variants()
     entry = variants.get(layout, default) if isinstance(variants, dict) else default
     default_variant, candidates, rules = candidate_variants(entry, default)
     slide = slide or {}
-    hinted = slide_variant_hint(slide, candidates)
+    hinted = slide_variant_hint(slide, candidates, layout)
     if hinted:
+        slide["_selected_variant"] = hinted
+        slide["_variant_source"] = "slide_hint"
         return hinted
     usage = theme.setdefault("_variant_usage", {})
     scores = content_variant_scores(layout, slide, candidates, rules)
@@ -648,6 +786,7 @@ def layout_variant(theme, layout, default="default", slide=None):
     selected = ranked[0] if ranked else default_variant
     usage[(layout, selected)] = usage.get((layout, selected), 0) + 1
     slide["_selected_variant"] = selected
+    slide["_variant_source"] = "global_content_pool"
     return selected
 
 
@@ -1997,7 +2136,7 @@ def render_comparison(shapes, slide, theme, shape_id):
     max_items = max(len(left.get("items", [])), len(right.get("items", [])))
     dense = max_items > 3 or item_weight(left.get("items", []) + right.get("items", [])) > 140
 
-    if variant in {"stacked_scorecards", "before_after_cards"}:
+    if variant == "before_after_cards":
         rows = [(left, theme["primary"], 2.0), (right, theme["accent"], 4.05)]
         for idx, (col, accent, y) in enumerate(rows):
             items = col.get("items", [])[:4]
@@ -2053,9 +2192,9 @@ def render_risk_matrix(shapes, slide, theme, shape_id):
     matrices = [c for c in slide.get("components", []) if c.get("type") == "risk_matrix"]
     matrix = matrices[0] if matrices else {}
     items = matrix.get("items", [])[:8]
-    variant = layout_variant(theme, "risk_matrix", "quadrant_watchlist", slide)
+    variant = layout_variant(theme, "risk_matrix", "ranked_watchlist", slide)
 
-    if variant == "ranked_watchlist" or (variant == "compact_quadrant" and len(items) >= 6):
+    if variant == "ranked_watchlist":
         ranked = sorted(
             items,
             key=lambda item: as_number(item.get("likelihood", 0.5), 0.5) * as_number(item.get("impact", 0.5), 0.5),
@@ -2078,78 +2217,6 @@ def render_risk_matrix(shapes, slide, theme, shape_id):
             shapes.append(text_box_xml(shape_id, "Risk Ranked Score", emu(x + 0.86), emu(y + 0.72), emu(w - 1.1), emu(0.3), [paragraph_xml(f"가능성 {as_number(item.get('likelihood', 0.5), 0.5):.1f} / 영향 {as_number(item.get('impact', 0.5), 0.5):.1f}", FONT["micro"], theme["muted"])]))
             shape_id += 1
         return shape_id
-
-    if variant == "heatmap_focus":
-        x, y, w, h = 0.95, 2.05, 11.35, 3.35
-        zones = [
-            ("관찰", x, y + h / 2, w / 2, h / 2, "F8FAFC"),
-            ("주의", x + w / 2, y + h / 2, w / 2, h / 2, "FEF3C7"),
-            ("상승 압력", x, y, w / 2, h / 2, "FEF3C7"),
-            ("우선 대응", x + w / 2, y, w / 2, h / 2, "FEE2E2"),
-        ]
-        for label, cx, cy, cw, ch, fill in zones:
-            shapes.append(text_box_xml(shape_id, "Risk Heatmap Zone", emu(cx), emu(cy), emu(cw), emu(ch), [paragraph_xml(label, FONT["label"], theme["muted"], True)], fill=fill, line=theme["line"], radius=True))
-            shape_id += 1
-        for idx, item in enumerate(items[:6], 1):
-            likelihood = max(0, min(1, as_number(item.get("likelihood", 0.5), 0.5)))
-            impact = max(0, min(1, as_number(item.get("impact", 0.5), 0.5)))
-            px = x + 0.45 + (w - 0.9) * impact
-            py = y + 0.45 + (h - 0.9) * (1 - likelihood)
-            color = theme_color(theme, item.get("emphasis", "warning"))
-            shapes.append(text_box_xml(shape_id, "Risk Heatmap Label", emu(px - 0.78), emu(py - 0.2), emu(1.56), emu(0.4), [paragraph_xml(clamp_text(item.get("label", ""), 14), FONT["micro"], "FFFFFF", True, "center")], fill=color, line="FFFFFF", radius=True, anchor="ctr", margin_x=0, margin_y=0))
-            shape_id += 1
-        return shape_id
-
-    x, y, w, h = 0.95, 2.05, 7.55, 3.45
-    mid_x, mid_y = x + w / 2, y + h / 2
-    fills = ["ECFDF5", "FEF3C7", "FEE2E2", "F8FAFC"]
-    cells = [(x, y + h / 2, fills[3]), (mid_x, y + h / 2, fills[1]), (x, y, fills[1]), (mid_x, y, fills[2])]
-    for cx, cy, fill in cells:
-        shapes.append(text_box_xml(shape_id, "Risk Cell", emu(cx), emu(cy), emu(w / 2), emu(h / 2), [], fill=fill, line=theme["line"], radius=True))
-        shape_id += 1
-    shapes.append(line_segment_xml(shape_id, "Risk Axis X", emu(x), emu(y + h), emu(x + w), emu(y + h), theme["muted"], 12700))
-    shape_id += 1
-    shapes.append(line_segment_xml(shape_id, "Risk Axis Y", emu(x), emu(y + h), emu(x), emu(y), theme["muted"], 12700))
-    shape_id += 1
-    shapes.append(text_box_xml(shape_id, "Axis X Label", emu(x + w - 1.35), emu(y + h + 0.12), emu(1.45), emu(0.25), [paragraph_xml("영향도 높음", FONT["micro"], theme["muted"], True)]))
-    shape_id += 1
-    shapes.append(text_box_xml(shape_id, "Axis Y Label", emu(x - 0.04), emu(y - 0.34), emu(1.55), emu(0.25), [paragraph_xml("가능성 높음", FONT["micro"], theme["muted"], True)]))
-    shape_id += 1
-
-    side_x = 8.85
-    side_y = 2.05
-    shapes.append(text_box_xml(shape_id, "Risk Watchlist Panel", emu(side_x), emu(side_y), emu(3.55), emu(3.48), [], fill=theme["surface"], line=theme["line"], radius=True))
-    shape_id += 1
-    shapes.append(text_box_xml(shape_id, "Risk Watchlist Title", emu(side_x + 0.28), emu(side_y + 0.22), emu(2.8), emu(0.32), [paragraph_xml("우선 점검 항목", FONT["label"], theme["muted"], True)]))
-    shape_id += 1
-
-    ranked = sorted(
-        enumerate(items, 1),
-        key=lambda pair: as_number(pair[1].get("likelihood", 0.5), 0.5) * as_number(pair[1].get("impact", 0.5), 0.5),
-        reverse=True,
-    )
-    rank_by_original = {original_idx: rank for rank, (original_idx, _) in enumerate(ranked, 1)}
-    for original_idx, item in enumerate(items, 1):
-        likelihood = max(0, min(1, as_number(item.get("likelihood", 0.5), 0.5)))
-        impact = max(0, min(1, as_number(item.get("impact", 0.5), 0.5)))
-        px = x + 0.3 + (w - 0.6) * impact
-        py = y + 0.3 + (h - 0.6) * (1 - likelihood)
-        color = theme_color(theme, item.get("emphasis", "warning"))
-        shapes.append(shape_xml(shape_id, "Risk Dot", emu(px - 0.12), emu(py - 0.12), emu(0.24), emu(0.24), color, "FFFFFF", "ellipse"))
-        shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Risk Dot Number", emu(px - 0.12), emu(py - 0.09), emu(0.24), emu(0.16), [paragraph_xml(str(rank_by_original[original_idx]), FONT["micro"], "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
-        shape_id += 1
-
-    for rank, (_, item) in enumerate(ranked[:5], 1):
-        row_y = side_y + 0.68 + (rank - 1) * 0.52
-        color = theme_color(theme, item.get("emphasis", "warning"))
-        shapes.append(shape_xml(shape_id, "Risk List Badge", emu(side_x + 0.28), emu(row_y + 0.04), emu(0.28), emu(0.28), color, color, "ellipse"))
-        shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Risk List Number", emu(side_x + 0.28), emu(row_y + 0.075), emu(0.28), emu(0.16), [paragraph_xml(str(rank), FONT["micro"], "FFFFFF", True, "center")], anchor="ctr", margin_x=0, margin_y=0))
-        shape_id += 1
-        shapes.append(text_box_xml(shape_id, "Risk List Label", emu(side_x + 0.68), emu(row_y), emu(2.6), emu(0.38), [paragraph_xml(clamp_text(item.get("label", ""), 24), FONT["caption"], theme["text"], True)]))
-        shape_id += 1
-    return shape_id
 
 
 def render_cause_effect(shapes, slide, theme, shape_id):
@@ -2504,7 +2571,7 @@ def render_title_cover(shapes, slide, theme, shape_id):
 
 
 def render_takeaway(shapes, slide, theme, shape_id):
-    variant = layout_variant(theme, "takeaway", "summary_panel", slide)
+    variant = layout_variant(theme, "takeaway", "decision_memo", slide)
     bullets = slide.get("bullets", [])[:4]
     density = content_density([slide.get("title", "")] + bullets)
     if variant == "ribbon_summary":

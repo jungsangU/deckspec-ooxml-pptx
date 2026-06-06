@@ -168,33 +168,60 @@ template_profiles.json
 ├── 대표 색상
 ├── 배경 모티프
 ├── bullet 스타일
-├── layout_variants
-└── 현재 DeckSpec 슬라이드에 적용
+└── 현재 DeckSpec 덱 스타일에 적용
+
+make_ppt.py 전역 variant pool
+└── 현재 DeckSpec 슬라이드 내용에 따라 layout variant 선택
 ```
 
-`layout_variants`는 같은 DeckSpec 레이아웃을 템플릿마다 다르게 그리도록 만듭니다. 예를 들어 `metric_dashboard`는 기본 카드형, 스코어보드형, 세로 테이블형, 스태거 카드형, 원형 버블형으로 달라질 수 있고, `bar_comparison`은 가로 막대, 세로 컬럼, lollipop 차트, 진행률 행으로 달라질 수 있습니다.
+템플릿 프로필은 색상, 배경 모티프, bullet 스타일 같은 톤앤매너를 정합니다. 레이아웃 변형은 특정 템플릿에 고정되지 않고 `make_ppt.py`의 전역 variant pool에서 슬라이드 내용에 맞게 선택됩니다. 예를 들어 어떤 템플릿이 선택되더라도 `metric_dashboard`는 기본 카드형, 스코어보드형, 세로 테이블형, 스태거 카드형, 원형 버블형 중에서 내용에 맞게 달라질 수 있고, `bar_comparison`은 가로 막대, 세로 컬럼, lollipop 차트, 진행률 행 중에서 선택될 수 있습니다.
 
-현재 렌더러는 `line_trend`, `cause_effect`, `risk_matrix`, `comparison`, `bullets/title_summary`도 adaptive variant를 지원합니다. 같은 `cause_effect`라도 짧은 파급 구조는 가로 캐스케이드 카드로, 내용이 많은 경우는 세로 스토리 레일 또는 swimlane 구조로 바뀔 수 있습니다. `risk_matrix`도 항목 수와 텍스트 밀도에 따라 사분면+watchlist, heatmap focus, ranked watchlist 중 하나를 선택합니다.
+현재 렌더러는 `line_trend`, `cause_effect`, `comparison`, `bullets/title_summary`도 adaptive variant를 지원합니다. 같은 `cause_effect`라도 짧은 파급 구조는 가로 캐스케이드 카드로, 내용이 많은 경우는 세로 스토리 레일 또는 swimlane 구조로 바뀔 수 있습니다. `risk_matrix`는 ranked watchlist 형태로 렌더링합니다.
 
-`layout_variants`는 문자열 하나 또는 후보 풀을 받을 수 있습니다. 후보 풀이 있으면 렌더러가 슬라이드 내용과 덱 안의 반복도를 보고 자동으로 하나를 고릅니다.
+현재 런타임에서는 프로필이 선택되어도 특정 프로필의 후보에 갇히지 않고, 전체 전역 후보 풀을 기준으로 렌더러가 슬라이드 내용과 덱 안의 반복도를 보고 자동 선택합니다.
 
 ```json
 {
-  "layout_variants": {
-    "metric_dashboard": {
-      "default": "radial_bubbles",
-      "candidates": ["radial_bubbles", "scoreboard", "vertical_stack"]
+  "design": {
+    "template": "auto_random",
+    "color_theme": "auto"
+  },
+  "slides": [
+    {
+      "layout": "metric_dashboard",
+      "variant": "auto"
     }
-  }
+  ]
 }
 ```
 
-슬라이드별로 강제하고 싶으면 DeckSpec 슬라이드에 `variant` 또는 `preferred_variant`를 넣습니다. 생략하거나 `"auto"`로 두면 자동 선택됩니다. 일반적으로 LLM은 각 슬라이드의 `layout`과 `components`를 내용 기준으로 결정하고, `variant`, 좌표, 글자 크기, 도형 간격은 렌더러에 맡기는 것이 좋습니다.
+전역 variant pool의 대표 후보:
 
 ```json
 {
-  "layout": "metric_dashboard",
-  "variant": "auto"
+  "metric_dashboard": ["strip_cards", "staggered_cards", "scoreboard", "vertical_stack", "radial_bubbles", "donut_metrics"],
+  "bar_comparison": ["horizontal_bars", "vertical_columns", "split_panel", "lollipop", "progress_rows", "blue_progress_rows"],
+  "line_trend": ["wide_plot_callout", "milestone_line", "compact_trend", "sparkline_stack", "small_multiples"],
+  "cause_effect": ["cascade_cards", "center_bridge", "vertical_story", "split_swimlane"],
+  "risk_matrix": ["ranked_watchlist"],
+  "comparison": ["split_columns", "before_after_cards"],
+  "takeaway": ["decision_memo", "ribbon_summary", "quote_band", "forecast_brief", "full_bleed_callout"]
+}
+```
+
+슬라이드별로 강제하고 싶으면 DeckSpec 슬라이드에 `variant` 또는 `preferred_variant`를 넣습니다. 단, 일반적으로는 `"auto"` 또는 생략을 권장합니다. 자동 선택은 다음 정보를 주면 더 좋아집니다.
+
+```json
+{
+  "layout": "bar_comparison",
+  "variant": "auto",
+  "evidence_type": "category_comparison",
+  "components": [
+    {
+      "type": "bar_chart",
+      "data": []
+    }
+  ]
 }
 ```
 

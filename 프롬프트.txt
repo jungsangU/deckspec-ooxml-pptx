@@ -39,6 +39,7 @@ Before creating slides, internally perform this planning sequence:
 10. Give the renderer enough evidence to choose adaptive variants: concise labels, exact values, component types, evidence_type, and layout_reason.
 
 The final JSON may include evidence_type and layout_reason fields on each slide. The renderer may ignore them, but they force better planning.
+Template selection controls tone, colors, background motifs, and typography feel. It does not lock slide layout variants. After a template is selected, the renderer chooses each slide's visual variant from the global variant pool using the slide's layout, components, evidence_type, and content density.
 
 ============================================================
 2. Hard Rules
@@ -57,6 +58,7 @@ The final JSON may include evidence_type and layout_reason fields on each slide.
 - Keep labels and captions short.
 - Use bullets as support, not as a substitute for chartable evidence.
 - Use "variant": "auto" or omit "variant" unless a specific renderer-supported composition is essential.
+- Do not bind variants to a specific template profile. Choose strong layout/components from the source evidence and let the renderer choose from the global variant pool.
 - Do not choose layouts for variety alone. Choose layouts by evidence type.
 - Do not try to imitate visual variety by changing only slide order. Visual variety comes from choosing the correct evidence layout and providing strong components.
 - If two slides share the same layout, make sure their components differ because the evidence genuinely differs. For example, a risk_matrix slide should include likelihood/impact items, while a cause_effect slide should include causes/events/effects.
